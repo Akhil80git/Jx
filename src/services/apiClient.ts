@@ -342,15 +342,15 @@ async function streamDirectGeminiRest(options: {
   onUsage?: (usage: TokenUsage) => void;
   signal?: AbortSignal;
 }): Promise<void> {
-  const rawModel = options.model || DEFAULT_GEMINI_MODEL.id;
-  // Map friendly ID for direct REST endpoint (never use deprecated 2.5 models)
-  const modelId = rawModel.includes('3.7')
-    ? 'gemini-3.7-flash'
-    : rawModel.includes('3.8')
-    ? 'gemini-3.8-flash'
-    : rawModel.includes('3.5')
-    ? 'gemini-3.8-flash'
-    : 'gemini-3.8-flash';
+  const rawModel = (options.model || DEFAULT_GEMINI_MODEL.id).toLowerCase();
+  let modelId = 'gemini-3.8-flash';
+  if (rawModel.includes('3.8')) modelId = 'gemini-3.8-flash';
+  else if (rawModel.includes('3.7')) modelId = 'gemini-3.7-flash';
+  else if (rawModel.includes('3.6')) modelId = 'gemini-3.6-flash';
+  else if (rawModel.includes('3.5') && rawModel.includes('lite')) modelId = 'gemini-3.5-flash-lite';
+  else if (rawModel.includes('3.5')) modelId = 'gemini-3.5-flash';
+  else if (rawModel.includes('3.1')) modelId = 'gemini-3.1-flash-lite';
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     modelId
   )}:streamGenerateContent?alt=sse&key=${encodeURIComponent(options.apiKey.trim())}`;
@@ -362,6 +362,9 @@ async function streamDirectGeminiRest(options: {
 
   const payload: any = {
     contents: formattedContents,
+    generationConfig: {
+      maxOutputTokens: 65536,
+    },
   };
 
   if (options.systemInstruction) {
@@ -754,6 +757,7 @@ export async function runUnifiedProjectDeepScan(options: {
   fileList: string[];
   sampleFilesContent: string;
   apiKey?: string;
+  model?: string;
   signal?: AbortSignal;
 }): Promise<{
   projectOverviewDoc: string;
@@ -761,7 +765,7 @@ export async function runUnifiedProjectDeepScan(options: {
   structureArchitectureDoc: string;
   featuresCatalogDoc: string;
 }> {
-  const { repoFullName, repoName, description, fileList, sampleFilesContent, apiKey, signal } = options;
+  const { repoFullName, repoName, description, fileList, sampleFilesContent, apiKey, model, signal } = options;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers['x-gemini-api-key'] = apiKey;
@@ -771,6 +775,7 @@ export async function runUnifiedProjectDeepScan(options: {
     headers,
     body: JSON.stringify({
       apiKey,
+      model,
       repoFullName,
       repoName,
       description,

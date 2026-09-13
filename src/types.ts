@@ -34,35 +34,62 @@ export interface GeminiModelOption {
 
 export const GEMINI_MODELS: GeminiModelOption[] = [
   {
-    id: 'gemini-3.5-flash',
-    name: 'Gemini 3.5 Flash',
-    shortName: '3.5 Flash',
-    badge: 'Fast & Efficient',
-    speed: 'High Speed',
-    description: 'Ultra-fast and efficient intelligence for everyday code generation, chat queries, and file audits',
-    tagColor: 'text-blue-300 border-blue-500/40 bg-blue-950/40',
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    shortName: '3.8 Flash',
+    badge: 'Flagship Speed',
+    speed: 'Next-Gen Ultra',
+    description: 'Next-generation flagship intelligence for entire project deep scans, full codebase architecture, and large file audits.',
+    tagColor: 'text-emerald-300 border-emerald-500/40 bg-emerald-950/40',
   },
   {
     id: 'gemini-3.7-flash',
     name: 'Gemini 3.7 Flash',
     shortName: '3.7 Flash',
-    badge: 'Advanced Reasoning',
+    badge: 'Hybrid Reasoning',
     speed: 'Deep Logic',
-    description: 'Hybrid reasoning and deep logic analysis for complex multi-hop code architecture and debugging',
+    description: 'Advanced reasoning, step-by-step logic analysis, and complex code refactoring across multi-hop dependencies.',
     tagColor: 'text-purple-300 border-purple-500/40 bg-purple-950/40',
   },
   {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    shortName: '3.8 Flash',
-    badge: 'Flagship Intelligence',
-    speed: 'Next-Gen Speed',
-    description: 'Next-generation multimodal performance for large codebases, full repository scanning, and complex refactors',
-    tagColor: 'text-emerald-300 border-emerald-500/40 bg-emerald-950/40',
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    shortName: '3.6 Flash',
+    badge: 'High Throughput',
+    speed: 'High Speed',
+    description: 'Balanced performance and high-throughput processing for repository tree analysis and quick code explanations.',
+    tagColor: 'text-cyan-300 border-cyan-500/40 bg-cyan-950/40',
+  },
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    shortName: '3.5 Flash',
+    badge: 'Fast & Balanced',
+    speed: 'High Speed',
+    description: 'Ultra-fast and efficient intelligence for everyday code generation, chat queries, and file auditing.',
+    tagColor: 'text-blue-300 border-blue-500/40 bg-blue-950/40',
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash-Lite',
+    shortName: '3.5 Flash-Lite',
+    badge: 'Ultra-Low Latency',
+    speed: 'Instant Response',
+    description: 'Cost-efficient and lowest latency model optimized for fast interactive chat, token calculation, and instant diffs.',
+    tagColor: 'text-amber-300 border-amber-500/40 bg-amber-950/40',
+  },
+  {
+    id: 'gemini-3.1-flash-lite',
+    name: 'Gemini 3.1 Flash-Lite',
+    shortName: '3.1 Flash-Lite',
+    badge: 'Lightweight Fast',
+    speed: 'Rapid Streaming',
+    description: 'Lightweight streaming engine designed for rapid inline edits and low-overhead code tasks.',
+    tagColor: 'text-rose-300 border-rose-500/40 bg-rose-950/40',
   },
 ];
 
-// Default model is Gemini 3.5 Flash
+// Default model is Gemini 3.8 Flash (or user-selected)
 export const DEFAULT_GEMINI_MODEL: GeminiModelOption = GEMINI_MODELS[0];
 
 // Backwards compatibility alias

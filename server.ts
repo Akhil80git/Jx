@@ -68,15 +68,12 @@ async function executeGeminiWithRetry<T>(
 function getGeminiModelForSdk(requestedModel?: string): string {
   if (!requestedModel) return "gemini-3.8-flash";
   const m = requestedModel.toLowerCase().trim();
-  if (m === "gemini-3.7-flash" || m.includes("3.7")) {
-    return "gemini-3.7-flash";
-  }
-  if (m === "gemini-3.8-flash" || m.includes("3.8")) {
-    return "gemini-3.8-flash";
-  }
-  if (m === "gemini-3.5-flash" || m.includes("3.5")) {
-    return "gemini-3.8-flash";
-  }
+  if (m.includes("3.8")) return "gemini-3.8-flash";
+  if (m.includes("3.7")) return "gemini-3.7-flash";
+  if (m.includes("3.6")) return "gemini-3.6-flash";
+  if (m.includes("3.5") && (m.includes("lite") || m.includes("flash-lite"))) return "gemini-3.5-flash-lite";
+  if (m.includes("3.5")) return "gemini-3.5-flash";
+  if (m.includes("3.1")) return "gemini-3.1-flash-lite";
   return "gemini-3.8-flash";
 }
 
@@ -732,6 +729,7 @@ Format cleanly with headers, bold text, code blocks, and bullet points.`;
             model: targetModel,
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
+              maxOutputTokens: 65536,
               systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in clear English/Hinglish with structured top-level intent followed by file-by-file documentation.",
             },
           })
@@ -743,6 +741,7 @@ Format cleanly with headers, bold text, code blocks, and bullet points.`;
             model: "gemini-3.8-flash",
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
+              maxOutputTokens: 65536,
               systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in clear English/Hinglish with structured top-level intent followed by file-by-file documentation.",
             },
           })
@@ -999,7 +998,8 @@ Format cleanly with headers, bold text, code blocks, and bullet points.`;
         });
       }
 
-      const { repoFullName, repoName, description, fileList, sampleFilesContent } = req.body;
+      const { repoFullName, repoName, description, fileList, sampleFilesContent, model } = req.body;
+      const targetModel = getGeminiModelForSdk(model || "gemini-3.8-flash");
 
       const ai = new GoogleGenAI({
         apiKey: effectiveKey.trim(),
@@ -1009,7 +1009,7 @@ Format cleanly with headers, bold text, code blocks, and bullet points.`;
       const fileListFormatted = Array.isArray(fileList) ? fileList.join("\n") : fileList;
 
       const prompt = `You are a Principal Software Architect and Lead Systems Engineer.
-Perform an exhaustive, deep scan of the entire repository "${repoFullName || repoName}" in one unified pass.
+Perform an exhaustive, complete deep scan of the entire repository "${repoFullName || repoName}" in one unified pass.
 Repository Description: ${description || "No description provided"}
 
 Here is the complete file list of the entire project:
@@ -1018,7 +1018,7 @@ ${fileListFormatted}
 Key source files content overview:
 ${sampleFilesContent || "No sample content provided."}
 
-Generate 4 SEPARATE, LARGE, COMPREHENSIVE MARKDOWN DOCUMENTS for this project:
+Generate 4 SEPARATE, LARGE, FULLY EXPANDED MARKDOWN DOCUMENTS for this project (Do not truncate or stop halfway, generate the complete comprehensive content):
 
 1. **PROJECT OVERVIEW (Kyu ban raha hai / Purpose & Vision)**:
    - Detailed explanation of why this website/project exists (kyu aur kis liye banaya gaya hai).
@@ -1051,15 +1051,31 @@ Return the response in the following EXACT JSON format:
 }
 \`\`\``;
 
-      const response = await executeGeminiWithRetry(() =>
-        ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          config: {
-            systemInstruction: "You are an elite technical documentation writer and principal system architect. Deliver large, rich, production-grade technical documents with pristine markdown formatting.",
-          },
-        })
-      );
+      let response: any;
+      try {
+        response = await executeGeminiWithRetry(() =>
+          ai.models.generateContent({
+            model: targetModel,
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              maxOutputTokens: 65536,
+              systemInstruction: "You are an elite technical documentation writer and principal system architect. Deliver large, rich, complete production-grade technical documents with pristine markdown formatting without truncating.",
+            },
+          })
+        );
+      } catch (scanErr: any) {
+        console.warn(`[Deep Scan with ${targetModel} failed, retrying with gemini-3.8-flash]:`, scanErr?.message);
+        response = await executeGeminiWithRetry(() =>
+          ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              maxOutputTokens: 65536,
+              systemInstruction: "You are an elite technical documentation writer and principal system architect. Deliver large, rich, complete production-grade technical documents with pristine markdown formatting.",
+            },
+          })
+        );
+      }
 
       const responseText = response.text || "";
       let jsonResult: any = null;
@@ -1100,7 +1116,8 @@ Return the response in the following EXACT JSON format:
         });
       }
 
-      const { repoFullName, repoName, fileList, sampleFilesContent, description } = req.body;
+      const { repoFullName, repoName, fileList, sampleFilesContent, description, model } = req.body;
+      const targetModel = getGeminiModelForSdk(model || "gemini-3.8-flash");
 
       const ai = new GoogleGenAI({
         apiKey: effectiveKey.trim(),
@@ -1166,15 +1183,31 @@ Return the response in the following exact JSON format:
 
 IMPORTANT: Include EVERY endpoint and summarize the purpose of files in "filesSummary".`;
 
-      const response = await executeGeminiWithRetry(() =>
-        ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          config: {
-            systemInstruction: "You are an expert software architect and technical writer. Provide precise, accurate, and structured insights about repositories.",
-          },
-        })
-      );
+      let response: any;
+      try {
+        response = await executeGeminiWithRetry(() =>
+          ai.models.generateContent({
+            model: targetModel,
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              maxOutputTokens: 65536,
+              systemInstruction: "You are an expert software architect and technical writer. Provide precise, accurate, comprehensive, and complete structured insights about repositories without truncating.",
+            },
+          })
+        );
+      } catch (archErr: any) {
+        console.warn(`[Architecture Analysis with ${targetModel} failed, retrying with gemini-3.8-flash]:`, archErr?.message);
+        response = await executeGeminiWithRetry(() =>
+          ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              maxOutputTokens: 65536,
+              systemInstruction: "You are an expert software architect and technical writer. Provide precise, accurate, and structured insights about repositories.",
+            },
+          })
+        );
+      }
 
       const responseText = response.text || "";
       let jsonResult: any = null;
@@ -1222,7 +1255,8 @@ IMPORTANT: Include EVERY endpoint and summarize the purpose of files in "filesSu
         });
       }
 
-      const { repoFullName, filePath, fileName, fileContent, language } = req.body;
+      const { repoFullName, filePath, fileName, fileContent, language, model } = req.body;
+      const targetModel = getGeminiModelForSdk(model || "gemini-3.8-flash");
 
       if (!filePath) {
         return res.status(400).json({ error: "filePath is required." });
@@ -1267,10 +1301,11 @@ Your response MUST be in this JSON structure:
       try {
         const response = await executeGeminiWithRetry(() =>
           ai.models.generateContent({
-            model: "gemini-3.8-flash",
+            model: targetModel,
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
-              systemInstruction: "You are a senior code analyst. Create structured, high-clarity markdown documentation for source code files.",
+              maxOutputTokens: 65536,
+              systemInstruction: "You are a senior code analyst. Create complete, structured, high-clarity markdown documentation for source code files without truncating.",
             },
           }),
           2,
@@ -1357,9 +1392,10 @@ Your response MUST be in this JSON structure:
           model: primaryModel,
           contents: formattedContents,
           config: {
+            maxOutputTokens: 65536,
             systemInstruction:
               systemInstruction ||
-              `You are a helpful, knowledgeable, and polite AI assistant powered by Google ${model || 'Gemini 3.5 Flash'}. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.`,
+              `You are a helpful, knowledgeable, and polite AI assistant powered by Google ${model || 'Gemini 3.8 Flash'}. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.`,
           },
         });
       } catch (streamInitErr: any) {
@@ -1368,6 +1404,7 @@ Your response MUST be in this JSON structure:
           model: "gemini-3.8-flash",
           contents: formattedContents,
           config: {
+            maxOutputTokens: 65536,
             systemInstruction:
               systemInstruction ||
               "You are a helpful, knowledgeable, and polite AI assistant powered by Google Gemini. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.",

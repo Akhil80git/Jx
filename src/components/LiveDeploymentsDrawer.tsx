@@ -35,6 +35,7 @@ export function LiveDeploymentsDrawer({
   const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isLoading, setIsLoading] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
+  const [isIframeLoading, setIsIframeLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // New Custom URL input
@@ -345,7 +346,10 @@ export function LiveDeploymentsDrawer({
                 {/* Reload Preview */}
                 <button
                   type="button"
-                  onClick={() => setIframeKey((prev) => prev + 1)}
+                  onClick={() => {
+                    setIsIframeLoading(true);
+                    setIframeKey((prev) => prev + 1);
+                  }}
                   className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                   title="Reload Live Preview"
                 >
@@ -460,6 +464,9 @@ export function LiveDeploymentsDrawer({
                   <div
                     key={item.id}
                     onClick={() => {
+                      if (selectedItem?.id !== item.id) {
+                        setIsIframeLoading(true);
+                      }
                       setSelectedItem(item);
                       setIframeKey((prev) => prev + 1);
                     }}
@@ -524,16 +531,45 @@ export function LiveDeploymentsDrawer({
             </div>
           </div>
 
-          {/* Right Area: Pure Full Live Output without URL bars or Clutter */}
+          {/* Right Area: Pure Full Live Output with Black Screen URL Transitions */}
           <div className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-hidden relative">
             {selectedItem ? (
-              <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-950">
+              <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-950 relative">
+                {/* Black Screen Transition Overlay while switching URLs or loading */}
+                {isIframeLoading && (
+                  <div
+                    id="iframe-dark-loading-screen"
+                    className="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center gap-3.5 p-6 animate-in fade-in duration-150"
+                  >
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                        <Globe className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                      </span>
+                    </div>
+
+                    <div className="text-center space-y-1 max-w-xs">
+                      <p className="text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5">
+                        <RefreshCw className="w-3 h-3 animate-spin text-indigo-400" />
+                        <span>Loading {selectedItem.repoName}...</span>
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-mono truncate max-w-[260px] mx-auto">
+                        {selectedItem.url}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {viewportMode === 'desktop' ? (
-                  /* 100% Edge-to-Edge Pure Output */
+                  /* 100% Edge-to-Edge Pure Dark Canvas Output */
                   <iframe
                     key={iframeKey}
                     src={selectedItem.url}
-                    className="w-full h-full bg-white border-0"
+                    onLoad={() => setIsIframeLoading(false)}
+                    className="w-full h-full bg-slate-950 border-0"
                     title={`Live output of ${selectedItem.repoName}`}
                     sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
                   />
@@ -541,14 +577,15 @@ export function LiveDeploymentsDrawer({
                   /* Mobile or Tablet Centered Output Frame */
                   <div className="w-full h-full flex items-center justify-center p-4 bg-slate-900/40">
                     <div
-                      className={`h-full max-h-[96vh] bg-white rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-800 transition-all duration-300 flex flex-col ${
+                      className={`h-full max-h-[96vh] bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-800 transition-all duration-300 flex flex-col relative ${
                         viewportMode === 'mobile' ? 'w-[375px]' : 'w-[768px]'
                       }`}
                     >
                       <iframe
                         key={iframeKey}
                         src={selectedItem.url}
-                        className="w-full flex-1 bg-white border-0"
+                        onLoad={() => setIsIframeLoading(false)}
+                        className="w-full flex-1 bg-slate-950 border-0"
                         title={`Live output of ${selectedItem.repoName}`}
                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
                       />

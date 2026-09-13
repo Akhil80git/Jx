@@ -96,7 +96,7 @@ export function RepoArchitectureViewer({
           Analyzing Repository Architecture & Endpoints...
         </h3>
         <p className="text-xs max-w-md text-slate-400">
-          Gemini 3.5 AI is reading through the repository files, extracting every API endpoint, and synthesizing why and how the project was built.
+          Gemini AI is reading through the repository files, extracting every API endpoint, and synthesizing why and how the project was built.
         </p>
       </div>
     );
