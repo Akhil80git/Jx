@@ -4,6 +4,7 @@ import { RepoSidebar } from './components/RepoSidebar';
 import { FileTreeSidebar } from './components/FileTreeSidebar';
 import { CodeWorkspace } from './components/CodeWorkspace';
 import { ChatPanel } from './components/ChatPanel';
+import { GitHubActivityPanel } from './components/GitHubActivityPanel';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { TokenSidebar } from './components/TokenSidebar';
@@ -17,6 +18,7 @@ import {
   RepoAnalysisState,
   FileAnalysisDoc,
   RepoArchitectureDoc,
+  DeepScanDocs,
 } from './types';
 import { calculateByteSize, formatByteSize, estimateTokens, getPayloadAnalytics } from './utils/tokenCalc';
 import { isPathIgnored } from './utils/gitignore';
@@ -46,6 +48,7 @@ export default function App() {
   const [isRepoSidebarOpen, setIsRepoSidebarOpen] = useState<boolean>(true);
   const [isFileSidebarOpen, setIsFileSidebarOpen] = useState<boolean>(true);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
+  const [isActivityPanelOpen, setIsActivityPanelOpen] = useState<boolean>(true);
   const [isTokenSidebarOpen, setIsTokenSidebarOpen] = useState<boolean>(false);
   const [activeCenterTab, setActiveCenterTab] = useState<CenterTab>('code');
 
@@ -87,6 +90,15 @@ export default function App() {
   });
 
   const autoAnalysisAbortRef = useRef<AbortController | null>(null);
+
+  // 4 Large AI Generated Documents
+  const [deepScanDocs, setDeepScanDocs] = useState<DeepScanDocs>({
+    projectOverview: '',
+    endpoints: '',
+    structureArchitecture: '',
+    featuresCatalog: '',
+    isScanning: false,
+  });
 
   // Generated Documentation (.md files)
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocs>({
@@ -242,6 +254,9 @@ export default function App() {
               [fileDoc.path]: fileDoc,
             },
           }));
+        },
+        onDeepScanDocsComplete: (docs) => {
+          setDeepScanDocs(docs);
         },
       });
 
@@ -584,9 +599,11 @@ export default function App() {
         onToggleFileSidebar={() => setIsFileSidebarOpen(!isFileSidebarOpen)}
         isChatOpen={isChatOpen}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
+        isActivityPanelOpen={isActivityPanelOpen}
+        onToggleActivityPanel={() => setIsActivityPanelOpen(!isActivityPanelOpen)}
       />
 
-      {/* 4-Pane Workspace Layout */}
+      {/* 5-Pane Workspace Layout with GitHub Live Activity Panel */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Pane 1: GitHub Repositories (Vertical Left) */}
         <RepoSidebar
@@ -627,6 +644,7 @@ export default function App() {
           }}
           onSaveFile={handleSaveFileLocal}
           generatedDocs={generatedDocs}
+          deepScanDocs={deepScanDocs}
           architectureDoc={repoAnalysisState.architectureDoc}
           activeFileDoc={currentActiveFileDoc}
           onTriggerDeepScan={handleTriggerDeepScan}
@@ -637,6 +655,7 @@ export default function App() {
           isScanning={repoAnalysisState.isAnalyzing || isScanning}
           activeCenterTab={activeCenterTab}
           onChangeCenterTab={setActiveCenterTab}
+          onOpenFileInEditor={(path) => handleSelectFile(path)}
         />
 
         {/* Pane 4: Gemini 3.5 AI Hub (Dual Vertical: File MDs + Architecture & Endpoints + Chat) */}
@@ -664,6 +683,17 @@ export default function App() {
             handleSelectFile(path);
           }}
           onTriggerReAnalysis={handleTriggerDeepScan}
+        />
+
+        {/* Pane 5: GitHub Live Activity (Right Vertical: Commits, Diffs, PRs, Issues) */}
+        <GitHubActivityPanel
+          repo={selectedRepo}
+          branch={branch}
+          githubToken={githubToken}
+          apiKey={apiKey}
+          isOpen={isActivityPanelOpen}
+          onClose={() => setIsActivityPanelOpen(false)}
+          onOpenFileInEditor={(path) => handleSelectFile(path)}
         />
 
         {/* Rightmost Vertical Token Counter Sidebar */}

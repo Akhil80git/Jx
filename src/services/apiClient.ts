@@ -1,4 +1,15 @@
-import { GitHubRepo, GitHubTreeItem, TokenUsage, FIXED_MODEL } from '../types';
+import {
+  GitHubRepo,
+  GitHubTreeItem,
+  TokenUsage,
+  FIXED_MODEL,
+  GitHubCommitItem,
+  GitHubCommitDetail,
+  GitHubPullRequestItem,
+  GitHubIssueItem,
+  CommitAiAnalysisDoc,
+  DeepScanDocs,
+} from '../types';
 import { parseGitignore, isPathIgnored } from '../utils/gitignore';
 
 /**
@@ -493,4 +504,246 @@ export async function streamGeminiChat(options: {
     }
     throw backendErr;
   }
+}
+
+/**
+ * Fetch commits for a repository
+ */
+export async function fetchRepoCommits(
+  owner: string,
+  repo: string,
+  branch?: string,
+  token?: string,
+  perPage = 30
+): Promise<GitHubCommitItem[]> {
+  const cleanToken = token?.trim() || '';
+  try {
+    const headers: Record<string, string> = {};
+    if (cleanToken) headers['x-github-token'] = cleanToken;
+
+    let url = `/api/github/commits?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&per_page=${perPage}`;
+    if (branch) url += `&branch=${encodeURIComponent(branch)}`;
+
+    const res = await fetch(url, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.commits)) return data.commits;
+    }
+  } catch {
+    // fallback
+  }
+
+  // Direct GitHub API fallback
+  let directUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=${perPage}`;
+  if (branch) directUrl += `&sha=${encodeURIComponent(branch)}`;
+
+  const directRes = await fetch(directUrl, { headers: getGitHubHeaders(cleanToken) });
+  if (!directRes.ok) {
+    throw new Error(`Failed to load commits (${directRes.status})`);
+  }
+  const commits = await directRes.json();
+  return Array.isArray(commits) ? commits : [];
+}
+
+/**
+ * Fetch detailed commit with file diffs and stats
+ */
+export async function fetchRepoCommitDetail(
+  owner: string,
+  repo: string,
+  ref: string,
+  token?: string
+): Promise<GitHubCommitDetail> {
+  const cleanToken = token?.trim() || '';
+  try {
+    const headers: Record<string, string> = {};
+    if (cleanToken) headers['x-github-token'] = cleanToken;
+
+    const res = await fetch(
+      `/api/github/commit-detail?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&ref=${encodeURIComponent(ref)}`,
+      { headers }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+  } catch {
+    // fallback
+  }
+
+  const directUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(ref)}`;
+  const directRes = await fetch(directUrl, { headers: getGitHubHeaders(cleanToken) });
+  if (!directRes.ok) {
+    throw new Error(`Failed to load commit detail (${directRes.status})`);
+  }
+  return await directRes.json();
+}
+
+/**
+ * Fetch Pull Requests
+ */
+export async function fetchRepoPulls(
+  owner: string,
+  repo: string,
+  state = 'all',
+  token?: string
+): Promise<GitHubPullRequestItem[]> {
+  const cleanToken = token?.trim() || '';
+  try {
+    const headers: Record<string, string> = {};
+    if (cleanToken) headers['x-github-token'] = cleanToken;
+
+    const res = await fetch(
+      `/api/github/pulls?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&state=${encodeURIComponent(state)}`,
+      { headers }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.pulls)) return data.pulls;
+    }
+  } catch {
+    // fallback
+  }
+
+  const directUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=${encodeURIComponent(state)}&per_page=30&sort=updated`;
+  const directRes = await fetch(directUrl, { headers: getGitHubHeaders(cleanToken) });
+  if (!directRes.ok) {
+    throw new Error(`Failed to load pull requests (${directRes.status})`);
+  }
+  const pulls = await directRes.json();
+  return Array.isArray(pulls) ? pulls : [];
+}
+
+/**
+ * Fetch Issues
+ */
+export async function fetchRepoIssues(
+  owner: string,
+  repo: string,
+  state = 'all',
+  token?: string
+): Promise<GitHubIssueItem[]> {
+  const cleanToken = token?.trim() || '';
+  try {
+    const headers: Record<string, string> = {};
+    if (cleanToken) headers['x-github-token'] = cleanToken;
+
+    const res = await fetch(
+      `/api/github/issues?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&state=${encodeURIComponent(state)}`,
+      { headers }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.issues)) return data.issues;
+    }
+  } catch {
+    // fallback
+  }
+
+  const directUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?state=${encodeURIComponent(state)}&per_page=30&sort=updated`;
+  const directRes = await fetch(directUrl, { headers: getGitHubHeaders(cleanToken) });
+  if (!directRes.ok) {
+    throw new Error(`Failed to load issues (${directRes.status})`);
+  }
+  const issues = await directRes.json();
+  const pureIssues = Array.isArray(issues) ? issues.filter((i: any) => !i.pull_request) : [];
+  return pureIssues;
+}
+
+/**
+ * Explain a Commit and its Diffs using Gemini AI
+ */
+export async function explainCommitWithAI(options: {
+  commitDetail: GitHubCommitDetail;
+  repoFullName: string;
+  apiKey?: string;
+  signal?: AbortSignal;
+}): Promise<CommitAiAnalysisDoc> {
+  const { commitDetail, repoFullName, apiKey, signal } = options;
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['x-gemini-api-key'] = apiKey;
+
+  const res = await fetch('/api/github/explain-commit', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      apiKey,
+      commitSha: commitDetail.sha,
+      commitMessage: commitDetail.commit.message,
+      authorName: commitDetail.commit.author.name,
+      stats: commitDetail.stats,
+      files: commitDetail.files?.map((f) => ({
+        filename: f.filename,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+        patch: f.patch?.slice(0, 2000),
+      })),
+      repoFullName,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to explain commit (${res.status})`);
+  }
+
+  const data = await res.json();
+  return {
+    sha: commitDetail.sha,
+    commitMessage: commitDetail.commit.message,
+    authorName: commitDetail.commit.author.name,
+    purpose: data.purpose || commitDetail.commit.message,
+    filesSummary: `${commitDetail.files?.length || 0} files modified`,
+    codeChanges: `+${commitDetail.stats?.additions || 0} / -${commitDetail.stats?.deletions || 0}`,
+    impact: 'Modified codebase behavior',
+    fullMarkdown: data.markdown || `# Commit ${commitDetail.sha}\n\n${commitDetail.commit.message}`,
+    createdAt: Date.now(),
+  };
+}
+
+/**
+ * Unified Project Deep Scan (Scans whole project together in 1 pass -> 4 Large Documents)
+ */
+export async function runUnifiedProjectDeepScan(options: {
+  repoFullName: string;
+  repoName: string;
+  description?: string | null;
+  fileList: string[];
+  sampleFilesContent: string;
+  apiKey?: string;
+  signal?: AbortSignal;
+}): Promise<{
+  projectOverviewDoc: string;
+  endpointsDoc: string;
+  structureArchitectureDoc: string;
+  featuresCatalogDoc: string;
+}> {
+  const { repoFullName, repoName, description, fileList, sampleFilesContent, apiKey, signal } = options;
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['x-gemini-api-key'] = apiKey;
+
+  const res = await fetch('/api/repo/deep-scan', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      apiKey,
+      repoFullName,
+      repoName,
+      description,
+      fileList,
+      sampleFilesContent,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Deep scan failed (${res.status})`);
+  }
+
+  return await res.json();
 }

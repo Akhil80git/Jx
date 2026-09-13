@@ -129,5 +129,105 @@ export interface RepoAnalysisState {
 }
 
 export type CenterTab = 'code' | 'docs' | 'preview';
-export type DocsSubTab = 'architecture' | 'endpoints' | 'setup' | 'audit';
-export type ChatHubTab = 'file_docs' | 'architecture' | 'chat';
+export type DocsSubTab = 'overview' | 'endpoints' | 'structure' | 'features';
+export type ChatHubTab = 'file_docs' | 'architecture' | 'activity' | 'chat';
+
+export interface DeepScanDocs {
+  projectOverview: string; // Doc 1: Kyu ban raha hai & deep overview
+  endpoints: string; // Doc 2: All endpoints in whole site
+  structureArchitecture: string; // Doc 3: Complete architecture & codebase structure
+  featuresCatalog: string; // Doc 4: All features & capabilities in project
+  isScanning: boolean;
+  generatedAt?: number;
+}
+
+export interface GitHubCommitItem {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name: string;
+      email?: string;
+      date: string;
+    };
+  };
+  author?: {
+    login: string;
+    avatar_url: string;
+  };
+  html_url: string;
+}
+
+export interface CommitFileChange {
+  filename: string;
+  status: 'added' | 'removed' | 'modified' | 'renamed' | string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch?: string;
+  previous_filename?: string;
+}
+
+export interface GitHubCommitDetail {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name: string;
+      date: string;
+    };
+  };
+  author?: {
+    login: string;
+    avatar_url: string;
+  };
+  stats?: {
+    total: number;
+    additions: number;
+    deletions: number;
+  };
+  files?: CommitFileChange[];
+  html_url: string;
+}
+
+export interface GitHubPullRequestItem {
+  id: number;
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  user: {
+    login: string;
+    avatar_url?: string;
+  };
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+  body?: string | null;
+}
+
+export interface GitHubIssueItem {
+  id: number;
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  user: {
+    login: string;
+    avatar_url?: string;
+  };
+  created_at: string;
+  comments: number;
+  html_url: string;
+  body?: string | null;
+}
+
+export interface CommitAiAnalysisDoc {
+  sha: string;
+  commitMessage: string;
+  authorName: string;
+  purpose: string;
+  filesSummary: string;
+  codeChanges: string;
+  impact: string;
+  fullMarkdown: string;
+  createdAt: number;
+}

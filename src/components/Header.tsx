@@ -1,4 +1,18 @@
-import { Sparkles, Key, Plus, Trash2, Download, ShieldCheck, AlertTriangle, Cpu, FolderGit2, FolderTree, MessageSquare, Github } from 'lucide-react';
+import {
+  Sparkles,
+  Key,
+  Plus,
+  Trash2,
+  Download,
+  ShieldCheck,
+  AlertTriangle,
+  Cpu,
+  FolderGit2,
+  FolderTree,
+  MessageSquare,
+  Github,
+  GitCommit,
+} from 'lucide-react';
 import { FIXED_MODEL } from '../types';
 
 interface HeaderProps {
@@ -19,6 +33,8 @@ interface HeaderProps {
   onToggleFileSidebar: () => void;
   isChatOpen: boolean;
   onToggleChat: () => void;
+  isActivityPanelOpen: boolean;
+  onToggleActivityPanel: () => void;
 }
 
 export function Header({
@@ -39,6 +55,8 @@ export function Header({
   onToggleFileSidebar,
   isChatOpen,
   onToggleChat,
+  isActivityPanelOpen,
+  onToggleActivityPanel,
 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-2.5 sm:px-4 py-2">
@@ -103,6 +121,20 @@ export function Header({
               title="Toggle AI Chat & Code Studio Panel"
             >
               <MessageSquare className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleActivityPanel}
+              className={`p-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+                isActivityPanelOpen
+                  ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              title="Toggle Right GitHub Live Activity (Commits, Diffs, PRs, Issues)"
+            >
+              <GitCommit className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden xl:inline text-[11px]">Live Activity</span>
             </button>
           </div>
         </div>
