@@ -65,6 +65,30 @@ async function executeGeminiWithRetry<T>(
   throw new Error("Maximum retry attempts reached.");
 }
 
+function getGeminiModelForSdk(requestedModel?: string): string {
+  if (!requestedModel) return "gemini-3.1-flash-lite";
+  const m = requestedModel.toLowerCase().trim();
+  if (
+    m === "gemini-3.5-flash-lite" ||
+    m.includes("3.5-flash-lite") ||
+    m.includes("flash-lite") ||
+    m.includes("flashlight") ||
+    m.includes("lite")
+  ) {
+    return "gemini-3.1-flash-lite";
+  }
+  if (m === "gemini-3.5-flash" || m.includes("3.5-flash")) {
+    return "gemini-flash-latest";
+  }
+  if (m === "gemini-3.7-flash" || m.includes("3.7")) {
+    return "gemini-3.8-flash";
+  }
+  if (m === "gemini-3.8-flash" || m.includes("3.8")) {
+    return "gemini-3.8-flash";
+  }
+  return requestedModel;
+}
+
 const PORT = 3000;
 
 async function startServer() {
@@ -381,7 +405,8 @@ async function startServer() {
         });
       }
 
-      const { commitSha, commitMessage, authorName, stats, files, repoFullName } = req.body;
+      const { commitSha, commitMessage, authorName, stats, files, repoFullName, model } = req.body;
+      const targetModel = getGeminiModelForSdk(model || "gemini-3.5-flash-lite");
 
       const ai = new GoogleGenAI({
         apiKey: effectiveKey.trim(),
@@ -419,15 +444,29 @@ Generate a clear, thorough, and highly readable Markdown explanation of this com
 
 Format as a pristine Markdown document with headers, bold text, bullet points, and code blocks.`;
 
-      const response = await executeGeminiWithRetry(() =>
-        ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          config: {
-            systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in bilingual clear English/Hinglish.",
-          },
-        })
-      );
+      let response: any;
+      try {
+        response = await executeGeminiWithRetry(() =>
+          ai.models.generateContent({
+            model: targetModel,
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in bilingual clear English/Hinglish.",
+            },
+          })
+        );
+      } catch (genErr: any) {
+        console.warn(`[Commit Explainer Model ${targetModel} failed, retrying with gemini-3.8-flash]:`, genErr?.message);
+        response = await executeGeminiWithRetry(() =>
+          ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in bilingual clear English/Hinglish.",
+            },
+          })
+        );
+      }
 
       const markdown = response.text || `# Commit Analysis: \`${commitSha?.slice(0, 7)}\`\n\n${commitMessage}`;
       res.json({
@@ -435,6 +474,7 @@ Format as a pristine Markdown document with headers, bold text, bullet points, a
         commitMessage,
         authorName,
         markdown,
+        modelUsed: model || "gemini-3.5-flash-lite",
       });
     } catch (error: any) {
       console.error("Commit analysis error:", error);
@@ -778,13 +818,13 @@ Your response MUST be in this JSON structure:
         });
       }
 
-      const { messages, model = "gemini-3.8-flash", systemInstruction } = req.body;
+      const { messages, model = "gemini-3.5-flash-lite", systemInstruction } = req.body;
 
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({ error: "Messages array is required." });
       }
 
-      const chosenModel = "gemini-3.8-flash";
+      const primaryModel = getGeminiModelForSdk(model);
 
       const ai = new GoogleGenAI({
         apiKey: effectiveKey.trim(),
@@ -807,15 +847,29 @@ Your response MUST be in this JSON structure:
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders?.();
 
-      const responseStream = await ai.models.generateContentStream({
-        model: chosenModel,
-        contents: formattedContents,
-        config: {
-          systemInstruction:
-            systemInstruction ||
-            "You are a helpful, knowledgeable, and polite AI assistant powered by Google Gemini 3.8 Flash. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.",
-        },
-      });
+      let responseStream: any;
+      try {
+        responseStream = await ai.models.generateContentStream({
+          model: primaryModel,
+          contents: formattedContents,
+          config: {
+            systemInstruction:
+              systemInstruction ||
+              `You are a helpful, knowledgeable, and polite AI assistant powered by Google ${model || 'Gemini 3.5 Flash-Lite'}. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.`,
+          },
+        });
+      } catch (streamInitErr: any) {
+        console.warn(`[Stream Model Error for ${primaryModel}, falling back to gemini-3.8-flash]:`, streamInitErr?.message);
+        responseStream = await ai.models.generateContentStream({
+          model: "gemini-3.8-flash",
+          contents: formattedContents,
+          config: {
+            systemInstruction:
+              systemInstruction ||
+              "You are a helpful, knowledgeable, and polite AI assistant powered by Google Gemini. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.",
+          },
+        });
+      }
 
       let latestUsage: any = null;
 

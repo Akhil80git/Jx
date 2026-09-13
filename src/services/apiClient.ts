@@ -3,6 +3,7 @@ import {
   GitHubTreeItem,
   TokenUsage,
   FIXED_MODEL,
+  DEFAULT_GEMINI_MODEL,
   GitHubCommitItem,
   GitHubCommitDetail,
   GitHubPullRequestItem,
@@ -309,12 +310,21 @@ export async function fetchRepoFile(
 async function streamDirectGeminiRest(options: {
   messages: Array<{ role: string; content: string }>;
   apiKey: string;
+  model?: string;
   systemInstruction?: string;
   onChunk: (text: string) => void;
   onUsage?: (usage: TokenUsage) => void;
   signal?: AbortSignal;
 }): Promise<void> {
-  const modelId = FIXED_MODEL.id;
+  const rawModel = options.model || DEFAULT_GEMINI_MODEL.id;
+  // Map friendly ID for direct REST endpoint
+  const modelId = rawModel.includes('flash-lite')
+    ? 'gemini-2.5-flash-lite'
+    : rawModel.includes('3.5-flash')
+    ? 'gemini-2.5-flash'
+    : rawModel.includes('3.7')
+    ? 'gemini-2.5-flash'
+    : 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     modelId
   )}:streamGenerateContent?alt=sse&key=${encodeURIComponent(options.apiKey.trim())}`;
@@ -414,6 +424,7 @@ async function streamDirectGeminiRest(options: {
 export async function streamGeminiChat(options: {
   messages: Array<{ role: string; content: string }>;
   apiKey: string;
+  model?: string;
   systemInstruction?: string;
   onChunk: (text: string) => void;
   onUsage?: (usage: TokenUsage) => void;
@@ -434,7 +445,7 @@ export async function streamGeminiChat(options: {
         apiKey: cleanKey,
         messages: options.messages,
         systemInstruction: options.systemInstruction,
-        model: FIXED_MODEL.id,
+        model: options.model || DEFAULT_GEMINI_MODEL.id,
       }),
       signal: options.signal,
     });
@@ -657,9 +668,10 @@ export async function explainCommitWithAI(options: {
   commitDetail: GitHubCommitDetail;
   repoFullName: string;
   apiKey?: string;
+  model?: string;
   signal?: AbortSignal;
 }): Promise<CommitAiAnalysisDoc> {
-  const { commitDetail, repoFullName, apiKey, signal } = options;
+  const { commitDetail, repoFullName, apiKey, model, signal } = options;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (apiKey) headers['x-gemini-api-key'] = apiKey;
@@ -669,6 +681,7 @@ export async function explainCommitWithAI(options: {
     headers,
     body: JSON.stringify({
       apiKey,
+      model: model || DEFAULT_GEMINI_MODEL.id,
       commitSha: commitDetail.sha,
       commitMessage: commitDetail.commit.message,
       authorName: commitDetail.commit.author.name,
@@ -701,6 +714,7 @@ export async function explainCommitWithAI(options: {
     impact: 'Modified codebase behavior',
     fullMarkdown: data.markdown || `# Commit ${commitDetail.sha}\n\n${commitDetail.commit.message}`,
     createdAt: Date.now(),
+    modelUsed: data.modelUsed || model || DEFAULT_GEMINI_MODEL.id,
   };
 }
 

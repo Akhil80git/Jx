@@ -18,14 +18,64 @@ export interface ChatMessage {
   formattedSize?: string;
   actionType?: 'chat' | 'code_edit' | 'file_created' | 'repo_scan';
   targetFile?: string;
+  modelId?: string;
+  modelName?: string;
 }
 
-export const FIXED_MODEL = {
-  id: 'gemini-3.8-flash',
-  name: 'Gemini 3.8 Flash',
-  badge: 'Active Model',
-  description: 'High-speed, powerful reasoning and coding model from Google Gemini',
-};
+export interface GeminiModelOption {
+  id: string;
+  name: string;
+  shortName: string;
+  badge: string;
+  speed: string;
+  description: string;
+  tagColor: string;
+}
+
+export const GEMINI_MODELS: GeminiModelOption[] = [
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash-Lite',
+    shortName: '3.5 Lite',
+    badge: 'Default • Ultra Fast',
+    speed: 'Ultra Fast',
+    description: 'Lightweight, ultra-fast latency for high-speed queries, instant code lookups, and diff audits',
+    tagColor: 'text-amber-300 border-amber-500/40 bg-amber-950/40',
+  },
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash',
+    shortName: '3.5 Flash',
+    badge: 'Fast & Balanced',
+    speed: 'High Speed',
+    description: 'Balanced throughput for standard codebase analysis, bug audits, and code generation',
+    tagColor: 'text-blue-300 border-blue-500/40 bg-blue-950/40',
+  },
+  {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    shortName: '3.7 Flash',
+    badge: 'Advanced Reasoning',
+    speed: 'Deep Logic',
+    description: 'Enhanced analytical reasoning and multi-hop software architecture problem solving',
+    tagColor: 'text-purple-300 border-purple-500/40 bg-purple-950/40',
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    shortName: '3.8 Flash',
+    badge: 'Flagship Intelligence',
+    speed: 'High Performance',
+    description: 'Highest capability multimodal intelligence for full repository scanning and large refactors',
+    tagColor: 'text-emerald-300 border-emerald-500/40 bg-emerald-950/40',
+  },
+];
+
+// Default model is Gemini 3.5 Flash-Lite as explicitly requested by user
+export const DEFAULT_GEMINI_MODEL: GeminiModelOption = GEMINI_MODELS[0];
+
+// Backwards compatibility alias
+export const FIXED_MODEL = DEFAULT_GEMINI_MODEL;
 
 export interface AttachedChatFile {
   path: string;
@@ -238,4 +288,5 @@ export interface CommitAiAnalysisDoc {
   impact: string;
   fullMarkdown: string;
   createdAt: number;
+  modelUsed?: string;
 }

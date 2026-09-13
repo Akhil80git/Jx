@@ -15,6 +15,7 @@ import {
   Check,
   HardDrive,
   FileText,
+  Cpu,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -25,6 +26,9 @@ import {
   GitHubRepo,
   GitHubTreeItem,
   FIXED_MODEL,
+  GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  GeminiModelOption,
 } from '../types';
 import { ChatInput } from './ChatInput';
 import { EmptyState } from './EmptyState';
@@ -42,6 +46,7 @@ interface ChatPanelProps {
       includeFile?: boolean;
       useMultiFiles?: boolean;
       selectedFilePaths?: string[];
+      model?: string;
     }
   ) => void;
   onStopStreaming: () => void;
@@ -75,6 +80,10 @@ interface ChatPanelProps {
   onSelectFileDocPath: (path: string) => void;
   onOpenInEditor: (path: string) => void;
   onTriggerReAnalysis: () => void;
+
+  // Gemini Chat Model selection
+  selectedChatModel?: GeminiModelOption;
+  onSelectChatModel?: (model: GeminiModelOption) => void;
 }
 
 export function ChatPanel({
@@ -101,6 +110,8 @@ export function ChatPanel({
   onSelectFileDocPath,
   onOpenInEditor,
   onTriggerReAnalysis,
+  selectedChatModel,
+  onSelectChatModel,
 }: ChatPanelProps) {
   // Hub Mode Tab: Full Architecture/Endpoints vs Interactive Chat
   const [activeHubTab, setActiveHubTab] = useState<ChatHubTab>('architecture');
@@ -108,7 +119,15 @@ export function ChatPanel({
   const [attachFileContext, setAttachFileContext] = useState<boolean>(true);
   const [isPickerOpen, setIsPickerOpen] = useState<boolean>(false);
   const [pickerSearch, setPickerSearch] = useState<string>('');
+  const [localChatModel, setLocalChatModel] = useState<GeminiModelOption>(DEFAULT_GEMINI_MODEL);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const activeChatModel = selectedChatModel || localChatModel;
+
+  const handleChooseChatModel = (model: GeminiModelOption) => {
+    setLocalChatModel(model);
+    onSelectChatModel?.(model);
+  };
 
   useEffect(() => {
     if (activeHubTab === 'chat') {
@@ -142,6 +161,7 @@ export function ChatPanel({
       includeFile: !isMultiFileMode && attachFileContext && Boolean(activeFile),
       useMultiFiles: isMultiFileMode && selectedChatFilePaths.length > 0,
       selectedFilePaths: selectedChatFilePaths,
+      model: activeChatModel.id,
     });
   };
 
@@ -271,6 +291,29 @@ export function ChatPanel({
                   >
                     Code Studio
                   </button>
+                </div>
+
+                {/* Gemini Model Selector for Chat */}
+                <div
+                  className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded px-1.5 py-0.5"
+                  title="Choose Gemini Model for Chat"
+                >
+                  <Cpu className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <select
+                    id="chat-model-dropdown-top"
+                    value={activeChatModel.id}
+                    onChange={(e) => {
+                      const found = GEMINI_MODELS.find((m) => m.id === e.target.value) || DEFAULT_GEMINI_MODEL;
+                      handleChooseChatModel(found);
+                    }}
+                    className="bg-transparent text-amber-300 text-[11px] font-semibold focus:outline-none cursor-pointer"
+                  >
+                    {GEMINI_MODELS.map((m) => (
+                      <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                        {m.name} {m.id === 'gemini-3.5-flash-lite' ? '(Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* File Context Mode Switch: Single File vs Multi-File */}
@@ -561,7 +604,9 @@ export function ChatPanel({
               onStopStreaming={onStopStreaming}
               hasKeyReady={hasKeyReady}
               onOpenApiKeyModal={onOpenApiKeyModal}
-              selectedModelName={FIXED_MODEL.name}
+              selectedModel={activeChatModel}
+              onSelectModel={handleChooseChatModel}
+              selectedModelName={activeChatModel.name}
               onDraftChange={onDraftChange}
             />
           </div>

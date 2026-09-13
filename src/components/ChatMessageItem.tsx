@@ -95,7 +95,7 @@ export function ChatMessageItem({ message, isStreaming }: ChatMessageItemProps) 
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span className="text-xs font-semibold tracking-wide text-slate-400">
-                {isUser ? 'You' : FIXED_MODEL.name}
+                {isUser ? 'You' : (message.modelName || FIXED_MODEL.name)}
               </span>
               {isUser ? (
                 <div className="inline-flex items-center gap-1">

@@ -17,6 +17,7 @@ import {
   X,
   Clock,
   User,
+  Cpu,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -27,6 +28,9 @@ import {
   GitHubPullRequestItem,
   GitHubIssueItem,
   CommitAiAnalysisDoc,
+  GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  GeminiModelOption,
 } from '../types';
 import {
   fetchRepoCommits,
@@ -72,6 +76,7 @@ export function GitHubActivityPanel({
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
 
   // Commit AI Analysis Doc
+  const [selectedCommitModel, setSelectedCommitModel] = useState<GeminiModelOption>(DEFAULT_GEMINI_MODEL);
   const [aiDocs, setAiDocs] = useState<Record<string, CommitAiAnalysisDoc>>({});
   const [aiDocErrors, setAiDocErrors] = useState<Record<string, string>>({});
   const [isGeneratingAiDoc, setIsGeneratingAiDoc] = useState<boolean>(false);
@@ -137,7 +142,7 @@ export function GitHubActivityPanel({
 
       // Auto-trigger AI explanation if not yet generated
       if (!aiDocs[sha]) {
-        generateAiExplanation(detail);
+        generateAiExplanation(detail, selectedCommitModel.id);
       }
     } catch (err: any) {
       console.warn('Could not fetch commit detail:', err);
@@ -146,9 +151,10 @@ export function GitHubActivityPanel({
     }
   };
 
-  const generateAiExplanation = async (commitDetail: GitHubCommitDetail) => {
+  const generateAiExplanation = async (commitDetail: GitHubCommitDetail, modelId?: string) => {
     if (!repo || isGeneratingAiDoc) return;
     setIsGeneratingAiDoc(true);
+    const targetModelId = modelId || selectedCommitModel.id;
     setAiDocErrors((prev) => {
       const next = { ...prev };
       delete next[commitDetail.sha];
@@ -160,6 +166,7 @@ export function GitHubActivityPanel({
         commitDetail,
         repoFullName: repo.full_name,
         apiKey,
+        model: targetModelId,
       });
       setAiDocs((prev) => ({
         ...prev,
@@ -412,9 +419,9 @@ ${filesList || 'No file changes recorded.'}
                   {selectedCommitDetail.commit.message}
                 </p>
 
-                {/* Sub-Tabs: Diff vs AI Explainer Doc */}
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-1">
+                {/* Sub-Tabs: Diff vs AI Explainer Doc with Gemini Model Selector */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setCommitSubTab('diff')}
@@ -438,6 +445,45 @@ ${filesList || 'No file changes recorded.'}
                       <Sparkles className="w-3 h-3 text-amber-300" />
                       <span>AI Commit Doc</span>
                     </button>
+
+                    {/* Gemini Model Selector next to AI Commit Doc button */}
+                    <div
+                      className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded px-1.5 py-0.5"
+                      title="Choose Gemini Model for Commit Analysis"
+                    >
+                      <Cpu className="w-3 h-3 text-amber-400 shrink-0" />
+                      <select
+                        id="commit-gemini-model-selector"
+                        value={selectedCommitModel.id}
+                        onChange={(e) => {
+                          const chosen = GEMINI_MODELS.find((m) => m.id === e.target.value) || DEFAULT_GEMINI_MODEL;
+                          setSelectedCommitModel(chosen);
+                          if (selectedCommitDetail) {
+                            generateAiExplanation(selectedCommitDetail, chosen.id);
+                          }
+                        }}
+                        className="bg-transparent text-amber-300 text-[11px] font-medium focus:outline-none cursor-pointer"
+                      >
+                        {GEMINI_MODELS.map((m) => (
+                          <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                            {m.name} {m.id === 'gemini-3.5-flash-lite' ? '(Default)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {commitSubTab === 'ai_doc' && selectedCommitDetail && (
+                      <button
+                        type="button"
+                        onClick={() => generateAiExplanation(selectedCommitDetail, selectedCommitModel.id)}
+                        disabled={isGeneratingAiDoc}
+                        className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                        title={`Re-run explanation with ${selectedCommitModel.name}`}
+                      >
+                        <RefreshCw className={`w-2.5 h-2.5 ${isGeneratingAiDoc ? 'animate-spin' : ''}`} />
+                        <span>Run {selectedCommitModel.shortName}</span>
+                      </button>
+                    )}
                   </div>
 
                   {commitSubTab === 'ai_doc' && currentAiDoc && (
@@ -548,10 +594,31 @@ ${filesList || 'No file changes recorded.'}
                       </p>
                     </div>
                   ) : currentAiDoc ? (
-                    <div className="markdown-body bg-transparent text-slate-200">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {currentAiDoc.fullMarkdown}
-                      </ReactMarkdown>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-2 rounded bg-slate-900/90 border border-slate-800 text-[11px] not-prose">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span className="text-slate-400">Generated by:</span>
+                          <span className="font-semibold text-amber-300">
+                            {GEMINI_MODELS.find((m) => m.id === currentAiDoc.modelUsed)?.name || currentAiDoc.modelUsed || selectedCommitModel.name}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => generateAiExplanation(selectedCommitDetail, selectedCommitModel.id)}
+                          disabled={isGeneratingAiDoc}
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                          title={`Re-run explanation with ${selectedCommitModel.name}`}
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Re-run ({selectedCommitModel.shortName})</span>
+                        </button>
+                      </div>
+                      <div className="markdown-body bg-transparent text-slate-200">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {currentAiDoc.fullMarkdown}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
@@ -567,11 +634,11 @@ ${filesList || 'No file changes recorded.'}
                           <div className="flex items-center gap-2 pt-1">
                             <button
                               type="button"
-                              onClick={() => generateAiExplanation(selectedCommitDetail)}
+                              onClick={() => generateAiExplanation(selectedCommitDetail, selectedCommitModel.id)}
                               className="px-2.5 py-1 rounded-md bg-rose-700 hover:bg-rose-600 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                             >
                               <RefreshCw className="w-3 h-3" />
-                              <span>Retry with Gemini</span>
+                              <span>Retry with {selectedCommitModel.shortName}</span>
                             </button>
                             <button
                               type="button"
@@ -588,11 +655,11 @@ ${filesList || 'No file changes recorded.'}
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => generateAiExplanation(selectedCommitDetail)}
+                              onClick={() => generateAiExplanation(selectedCommitDetail, selectedCommitModel.id)}
                               className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
                               <Sparkles className="w-3.5 h-3.5" />
-                              <span>Generate AI Explanation</span>
+                              <span>Generate AI Explanation ({selectedCommitModel.shortName})</span>
                             </button>
                             <button
                               type="button"

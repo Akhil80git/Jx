@@ -19,6 +19,9 @@ import {
   FileAnalysisDoc,
   RepoArchitectureDoc,
   DeepScanDocs,
+  GEMINI_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  GeminiModelOption,
 } from './types';
 import { calculateByteSize, formatByteSize, estimateTokens, getPayloadAnalytics } from './utils/tokenCalc';
 import { isPathIgnored } from './utils/gitignore';
@@ -122,6 +125,8 @@ export default function App() {
     }
   });
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  // Gemini Chat Model selection (defaults to Gemini 3.5 Flash-Lite)
+  const [selectedChatModel, setSelectedChatModel] = useState<GeminiModelOption>(DEFAULT_GEMINI_MODEL);
   // Multi-File Chat Selection State
   const [selectedChatFilePaths, setSelectedChatFilePaths] = useState<string[]>([]);
   const [isMultiFileMode, setIsMultiFileMode] = useState<boolean>(false);
@@ -420,6 +425,7 @@ export default function App() {
       includeFile?: boolean;
       useMultiFiles?: boolean;
       selectedFilePaths?: string[];
+      model?: string;
     }
   ) => {
     if (!text.trim() || isStreaming) return;
@@ -429,6 +435,10 @@ export default function App() {
       setIsApiKeyModalOpen(true);
       return;
     }
+
+    const chosenModelOption = options?.model
+      ? GEMINI_MODELS.find((m) => m.id === options.model) || selectedChatModel
+      : selectedChatModel;
 
     let enrichedPrompt = text;
     const isCodeMode = options?.mode === 'code';
@@ -530,6 +540,8 @@ export default function App() {
       role: 'assistant',
       content: '',
       timestamp: Date.now(),
+      modelId: chosenModelOption.id,
+      modelName: chosenModelOption.name,
     };
 
     const updatedMessages = [...messages, newUserMessage];
@@ -551,6 +563,7 @@ export default function App() {
       await streamGeminiChat({
         apiKey: keyToUse,
         messages: chatPayload,
+        model: chosenModelOption.id,
         signal: abortController.signal,
         onChunk: (chunkText) => {
           accumulatedContent += chunkText;
@@ -791,6 +804,8 @@ export default function App() {
             handleSelectFile(path);
           }}
           onTriggerReAnalysis={handleTriggerDeepScan}
+          selectedChatModel={selectedChatModel}
+          onSelectChatModel={setSelectedChatModel}
         />
 
         {/* Pane 5: GitHub Live Activity (Right Vertical: Commits, Diffs, PRs, Issues) */}

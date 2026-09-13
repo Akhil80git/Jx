@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { Send, Square, Sparkles, Key, Cpu, HardDrive, FileText, X, AlertCircle } from 'lucide-react';
 import { getPayloadAnalytics } from '../utils/tokenCalc';
+import { GeminiModelOption, GEMINI_MODELS, DEFAULT_GEMINI_MODEL } from '../types';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -8,7 +9,9 @@ interface ChatInputProps {
   isStreaming: boolean;
   hasKeyReady: boolean;
   onOpenApiKeyModal: () => void;
-  selectedModelName: string;
+  selectedModel?: GeminiModelOption;
+  onSelectModel?: (model: GeminiModelOption) => void;
+  selectedModelName?: string;
   onDraftChange?: (analytics: ReturnType<typeof getPayloadAnalytics> | null) => void;
 }
 
@@ -18,11 +21,16 @@ export function ChatInput({
   isStreaming,
   hasKeyReady,
   onOpenApiKeyModal,
+  selectedModel,
+  onSelectModel,
   selectedModelName,
   onDraftChange,
 }: ChatInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const currentModel = selectedModel || DEFAULT_GEMINI_MODEL;
+  const activeModelTitle = selectedModelName || currentModel.name;
 
   // Compute live analytics
   const analytics = getPayloadAnalytics(input);
@@ -100,7 +108,7 @@ export function ChatInput({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={`Message ${selectedModelName}... (paste text, code, or large data)`}
+            placeholder={`Message ${activeModelTitle}... (paste text, code, or large data)`}
             className="w-full pl-4 pr-14 pt-3 pb-3 sm:pb-3 bg-transparent text-slate-100 placeholder:text-slate-500 text-sm sm:text-base resize-none focus:outline-none max-h-52 leading-relaxed"
           />
 
@@ -194,11 +202,28 @@ export function ChatInput({
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-              <Sparkles className="w-3 h-3 text-blue-400" />
-              <span>Model: <strong className="text-slate-400 font-medium">{selectedModelName}</strong></span>
-              <span className="text-slate-700">•</span>
-              <span className="text-[11px] text-slate-500">Type ya paste karein live token & size dekhne ke liye</span>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-slate-400">Model:</span>
+                <select
+                  id="chat-input-model-selector"
+                  value={currentModel.id}
+                  onChange={(e) => {
+                    const chosen = GEMINI_MODELS.find((m) => m.id === e.target.value) || DEFAULT_GEMINI_MODEL;
+                    onSelectModel?.(chosen);
+                  }}
+                  className="bg-slate-900 text-amber-300 font-semibold text-[11px] border border-slate-700/80 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+                >
+                  {GEMINI_MODELS.map((m) => (
+                    <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                      {m.name} {m.id === 'gemini-3.5-flash-lite' ? '(Default)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="text-slate-700 hidden sm:inline">•</span>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">Type ya paste karein live token & size dekhne ke liye</span>
             </div>
           )}
 
