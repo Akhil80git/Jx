@@ -34,6 +34,11 @@ interface FileTreeSidebarProps {
   isLoadingTree: boolean;
   isOpen: boolean;
   onToggle: () => void;
+  selectedChatFilePaths?: string[];
+  onToggleChatFile?: (path: string) => void;
+  isMultiSelectMode?: boolean;
+  onToggleMultiSelectMode?: () => void;
+  onClearChatFiles?: () => void;
 }
 
 interface TreeNode {
@@ -77,6 +82,11 @@ export function FileTreeSidebar({
   isLoadingTree,
   isOpen,
   onToggle,
+  selectedChatFilePaths = [],
+  onToggleChatFile,
+  isMultiSelectMode = false,
+  onToggleMultiSelectMode,
+  onClearChatFiles,
 }: FileTreeSidebarProps) {
   const [filterQuery, setFilterQuery] = useState('');
   const [hideIgnored, setHideIgnored] = useState(true);
@@ -193,31 +203,57 @@ export function FileTreeSidebar({
             );
           }
 
+          const isChatSelected = Boolean(selectedChatFilePaths.includes(child.path));
+
           return (
-            <button
+            <div
               key={child.path}
               id={`file-node-${child.path.replace(/[^a-zA-Z0-9_-]/g, '_')}`}
-              type="button"
-              onClick={() => onSelectFile(child.path)}
-              style={{ paddingLeft: `${Math.max(16, level * 12 + 16)}px` }}
-              className={`w-full text-left py-1 pr-2 rounded-md flex items-center justify-between text-xs transition-colors cursor-pointer ${
-                isSelected
+              style={{ paddingLeft: `${Math.max(8, level * 12 + 8)}px` }}
+              className={`w-full py-1 pr-2 rounded-md flex items-center gap-1.5 text-xs transition-colors ${
+                isChatSelected
+                  ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-700/60 font-medium'
+                  : isSelected
                   ? 'bg-blue-600/20 text-blue-300 font-semibold border-l-2 border-blue-500'
                   : child.ignored
                   ? 'text-slate-500 hover:bg-slate-900 hover:text-slate-400 italic'
                   : 'text-slate-300 hover:bg-slate-900 hover:text-white'
               }`}
             >
-              <div className="flex items-center gap-1.5 truncate">
-                {getFileIcon(child.name)}
-                <span className="truncate">{child.name}</span>
-              </div>
-              {typeof child.size === 'number' && (
-                <span className="text-[10px] text-slate-500 font-mono shrink-0 ml-1">
-                  {formatByteSize(child.size)}
-                </span>
+              {isMultiSelectMode && (
+                <input
+                  type="checkbox"
+                  checked={isChatSelected}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onToggleChatFile?.(child.path);
+                  }}
+                  className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 cursor-pointer shrink-0 accent-emerald-500 ml-1"
+                  title="Toggle file for AI context"
+                />
               )}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMultiSelectMode && onToggleChatFile) {
+                    onToggleChatFile(child.path);
+                  } else {
+                    onSelectFile(child.path);
+                  }
+                }}
+                className="flex-1 flex items-center justify-between min-w-0 bg-transparent text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  {getFileIcon(child.name)}
+                  <span className="truncate">{child.name}</span>
+                </div>
+                {typeof child.size === 'number' && (
+                  <span className="text-[10px] text-slate-500 font-mono shrink-0 ml-1">
+                    {formatByteSize(child.size)}
+                  </span>
+                )}
+              </button>
+            </div>
           );
         })}
       </div>
@@ -266,7 +302,7 @@ export function FileTreeSidebar({
             type="button"
             onClick={onTriggerDeepScan}
             disabled={isScanning || treeItems.length === 0}
-            className="w-full flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-[11px] transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+            className="w-full flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-[11px] transition-all shadow-xs disabled:opacity-50 cursor-pointer mb-2"
           >
             {isScanning ? (
               <>
@@ -280,6 +316,52 @@ export function FileTreeSidebar({
               </>
             )}
           </button>
+        )}
+
+        {/* Multi-File AI Context Mode Switch */}
+        {repo && (
+          <div className="pt-1.5 border-t border-slate-800/80">
+            <button
+              id="multi-file-sidebar-toggle-btn"
+              type="button"
+              onClick={onToggleMultiSelectMode}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                isMultiSelectMode
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+              }`}
+              title="Toggle multi-file selection to attach multiple files to AI Chat"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Layers className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Multi-File AI Mode</span>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
+                  selectedChatFilePaths.length > 0
+                    ? isMultiSelectMode
+                      ? 'bg-emerald-800 text-white'
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {selectedChatFilePaths.length}
+              </span>
+            </button>
+
+            {isMultiSelectMode && selectedChatFilePaths.length > 0 && (
+              <div className="flex items-center justify-between text-[11px] text-emerald-400 pt-1.5 px-0.5">
+                <span>{selectedChatFilePaths.length} files attached for AI</span>
+                <button
+                  type="button"
+                  onClick={onClearChatFiles}
+                  className="text-slate-400 hover:text-rose-400 text-[10px] cursor-pointer underline"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Bot, User, Copy, Check, AlertCircle } from 'lucide-react';
-import { ChatMessage } from '../types';
+import { ChatMessage, FIXED_MODEL } from '../types';
 import { formatByteSize, calculateByteSize } from '../utils/tokenCalc';
+import { highlightCode, getPrismLanguage } from '../utils/syntaxHighlight';
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -26,22 +27,29 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
     }
   };
 
+  const highlightedHtml = highlightCode(textContent, language || 'javascript');
+
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-slate-700/60 bg-slate-950/90 shadow-sm">
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800 text-xs font-mono text-slate-400">
-        <span>{language || 'code'}</span>
+    <div className="my-3 rounded-lg overflow-hidden border border-[#2d2d2d] bg-[#1e1e1e] shadow-sm code-syntax-viewer">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#181818] border-b border-[#2d2d2d] text-xs font-mono text-slate-400">
+        <span className="text-indigo-400 font-semibold">{language || 'code'}</span>
         <button
           id={`copy-code-btn-${Math.random().toString(36).substring(7)}`}
           onClick={handleCopy}
-          className="flex items-center gap-1 hover:text-slate-200 transition-colors py-0.5 px-2 rounded hover:bg-slate-800"
+          className="flex items-center gap-1 hover:text-slate-200 transition-colors py-0.5 px-2 rounded hover:bg-slate-800 cursor-pointer"
           title="Copy code"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
           <span>{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
-      <div className="p-3.5 overflow-x-auto text-xs sm:text-sm font-mono text-slate-200 leading-relaxed">
-        <code>{children}</code>
+      <div className="p-3.5 overflow-x-auto text-xs sm:text-sm font-mono text-[#d4d4d4] leading-relaxed">
+        <pre className="!bg-transparent !p-0 !m-0">
+          <code
+            className={`language-${getPrismLanguage(language)} !bg-transparent`}
+            dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+          />
+        </pre>
       </div>
     </div>
   );
@@ -87,7 +95,7 @@ export function ChatMessageItem({ message, isStreaming }: ChatMessageItemProps) 
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span className="text-xs font-semibold tracking-wide text-slate-400">
-                {isUser ? 'You' : 'Gemini 3.5 Flash-Lite'}
+                {isUser ? 'You' : FIXED_MODEL.name}
               </span>
               {isUser ? (
                 <div className="inline-flex items-center gap-1">

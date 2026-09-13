@@ -122,6 +122,29 @@ export default function App() {
     }
   });
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  // Multi-File Chat Selection State
+  const [selectedChatFilePaths, setSelectedChatFilePaths] = useState<string[]>([]);
+  const [isMultiFileMode, setIsMultiFileMode] = useState<boolean>(false);
+  const fileContentCacheRef = useRef<Record<string, { content: string; language: string; size: number }>>({});
+
+  const handleToggleChatFile = (path: string) => {
+    setSelectedChatFilePaths((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
+    );
+  };
+
+  const handleClearChatFiles = () => {
+    setSelectedChatFilePaths([]);
+  };
+
+  const handleSelectAllChatFiles = (paths: string[]) => {
+    setSelectedChatFilePaths(paths);
+  };
+
+  const handleToggleMultiFileMode = () => {
+    setIsMultiFileMode((prev) => !prev);
+  };
+
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Check server health on mount
@@ -344,6 +367,12 @@ export default function App() {
       const data = await fetchRepoFile(repo.owner.login, repo.name, filePath, ref, githubToken);
 
       const ext = data.name.split('.').pop() || '';
+      fileContentCacheRef.current[data.path] = {
+        content: data.content,
+        language: ext,
+        size: data.size,
+      };
+
       setActiveFile({
         path: data.path,
         name: data.name,
@@ -383,10 +412,15 @@ export default function App() {
     triggerAutoAnalysisForRepo(selectedRepo, treeItems, branch, gitignorePatterns);
   };
 
-  // Chat message send handler with active file context
+  // Chat message send handler with multi-file or active file context
   const handleSendMessage = async (
     text: string,
-    options?: { mode?: 'chat' | 'code'; includeFile?: boolean }
+    options?: {
+      mode?: 'chat' | 'code';
+      includeFile?: boolean;
+      useMultiFiles?: boolean;
+      selectedFilePaths?: string[];
+    }
   ) => {
     if (!text.trim() || isStreaming) return;
 
@@ -399,7 +433,74 @@ export default function App() {
     let enrichedPrompt = text;
     const isCodeMode = options?.mode === 'code';
 
-    if (options?.includeFile && activeFile) {
+    // Multi-File Context integration
+    const targetFilePaths =
+      options?.useMultiFiles && options?.selectedFilePaths && options.selectedFilePaths.length > 0
+        ? options.selectedFilePaths
+        : isMultiFileMode && selectedChatFilePaths.length > 0
+        ? selectedChatFilePaths
+        : [];
+
+    if (targetFilePaths.length > 0 && selectedRepo) {
+      const loadedFiles: Array<{ path: string; content: string; language: string }> = [];
+      const ref = branch || selectedRepo.default_branch;
+
+      showToast(`Loading ${targetFilePaths.length} file(s) for AI context...`);
+
+      for (const filePath of targetFilePaths) {
+        if (fileContentCacheRef.current[filePath]) {
+          loadedFiles.push({
+            path: filePath,
+            ...fileContentCacheRef.current[filePath],
+          });
+        } else if (activeFile && activeFile.path === filePath) {
+          loadedFiles.push({
+            path: filePath,
+            content: activeFile.content,
+            language: activeFile.language,
+          });
+          fileContentCacheRef.current[filePath] = {
+            content: activeFile.content,
+            language: activeFile.language,
+            size: activeFile.size || activeFile.content.length,
+          };
+        } else {
+          try {
+            const data = await fetchRepoFile(
+              selectedRepo.owner.login,
+              selectedRepo.name,
+              filePath,
+              ref,
+              githubToken
+            );
+            const ext = data.name.split('.').pop() || '';
+            fileContentCacheRef.current[filePath] = {
+              content: data.content,
+              language: ext,
+              size: data.size,
+            };
+            loadedFiles.push({
+              path: filePath,
+              content: data.content,
+              language: ext,
+            });
+          } catch (e: any) {
+            console.warn(`Could not load ${filePath} for chat context:`, e);
+          }
+        }
+      }
+
+      if (loadedFiles.length > 0) {
+        const fileBlocks = loadedFiles
+          .map(
+            (f, i) =>
+              `=== FILE [${i + 1}/${loadedFiles.length}]: "${f.path}" (${f.language}) ===\n\`\`\`${f.language}\n${f.content.slice(0, 50000)}\n\`\`\``
+          )
+          .join('\n\n');
+
+        enrichedPrompt = `[Multi-File Context: Repository "${selectedRepo.full_name}" - ${loadedFiles.length} files attached]\n\n${fileBlocks}\n\n=== USER REQUEST ===\n${text}`;
+      }
+    } else if (options?.includeFile && activeFile) {
       enrichedPrompt = `[Context: Active File "${activeFile.path}" (${activeFile.language})]\n\`\`\`${activeFile.language}\n${activeFile.content}\n\`\`\`\n\nUser Request: ${text}`;
     }
 
@@ -628,6 +729,11 @@ export default function App() {
           isLoadingTree={isLoadingTree}
           isOpen={isFileSidebarOpen}
           onToggle={() => setIsFileSidebarOpen(false)}
+          selectedChatFilePaths={selectedChatFilePaths}
+          onToggleChatFile={handleToggleChatFile}
+          isMultiSelectMode={isMultiFileMode}
+          onToggleMultiSelectMode={handleToggleMultiFileMode}
+          onClearChatFiles={handleClearChatFiles}
         />
 
         {/* Pane 3: Center Code Workspace & Documentation */}
@@ -653,7 +759,7 @@ export default function App() {
           onOpenFileInEditor={(path) => handleSelectFile(path)}
         />
 
-        {/* Pane 4: Gemini 3.5 AI Hub (Dual Vertical: Architecture & Endpoints + Chat) */}
+        {/* Pane 4: Gemini 3.8 AI Hub (Dual Vertical: Architecture & Endpoints + Chat) */}
         <ChatPanel
           messages={messages}
           isStreaming={isStreaming}
@@ -666,6 +772,13 @@ export default function App() {
           onDraftChange={setDraftAnalytics}
           isOpen={isChatOpen}
           onToggle={() => setIsChatOpen(false)}
+          treeItems={treeItems}
+          selectedChatFilePaths={selectedChatFilePaths}
+          onToggleChatFile={handleToggleChatFile}
+          onClearChatFiles={handleClearChatFiles}
+          onSelectAllChatFiles={handleSelectAllChatFiles}
+          isMultiFileMode={isMultiFileMode}
+          onToggleMultiFileMode={handleToggleMultiFileMode}
           selectedRepo={selectedRepo}
           repoAnalysisState={repoAnalysisState}
           onSelectFileDocPath={(path) => {

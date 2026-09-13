@@ -1,13 +1,28 @@
 import Prism from 'prismjs';
+
+// Ensure Prism is globally available before sub-languages load in Vite/ESM
+if (typeof window !== 'undefined' && !(window as any).Prism) {
+  (window as any).Prism = Prism;
+}
+if (typeof globalThis !== 'undefined' && !(globalThis as any).Prism) {
+  (globalThis as any).Prism = Prism;
+}
+
+// Load syntax grammars in correct dependency order
+import 'prismjs/components/prism-clike';
 import 'prismjs/components/prism-javascript';
 import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-markup';
 import 'prismjs/components/prism-jsx';
 import 'prismjs/components/prism-tsx';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-css';
+import 'prismjs/components/prism-scss';
 import 'prismjs/components/prism-markdown';
 import 'prismjs/components/prism-bash';
 import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-yaml';
+import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-diff';
 
 /**
@@ -32,11 +47,13 @@ export function getPrismLanguage(filenameOrLang: string): string {
     case 'json':
       return 'json';
     case 'css':
-    case 'scss':
       return 'css';
+    case 'scss':
+      return 'scss';
     case 'html':
+    case 'xml':
     case 'svg':
-      return 'html';
+      return 'markup';
     case 'md':
     case 'markdown':
       return 'markdown';
@@ -46,6 +63,11 @@ export function getPrismLanguage(filenameOrLang: string): string {
     case 'bash':
     case 'zsh':
       return 'bash';
+    case 'yaml':
+    case 'yml':
+      return 'yaml';
+    case 'sql':
+      return 'sql';
     case 'diff':
     case 'patch':
       return 'diff';
@@ -60,7 +82,11 @@ export function getPrismLanguage(filenameOrLang: string): string {
 export function highlightCode(code: string, filenameOrLang: string): string {
   if (!code) return '';
   const lang = getPrismLanguage(filenameOrLang);
-  const grammar = Prism.languages[lang] || Prism.languages.javascript || Prism.languages.markup;
+  const grammar =
+    Prism.languages[lang] ||
+    Prism.languages.typescript ||
+    Prism.languages.javascript ||
+    Prism.languages.markup;
 
   try {
     if (grammar) {

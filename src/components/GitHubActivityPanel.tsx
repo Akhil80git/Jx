@@ -73,6 +73,7 @@ export function GitHubActivityPanel({
 
   // Commit AI Analysis Doc
   const [aiDocs, setAiDocs] = useState<Record<string, CommitAiAnalysisDoc>>({});
+  const [aiDocErrors, setAiDocErrors] = useState<Record<string, string>>({});
   const [isGeneratingAiDoc, setIsGeneratingAiDoc] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<boolean>(false);
 
@@ -148,6 +149,11 @@ export function GitHubActivityPanel({
   const generateAiExplanation = async (commitDetail: GitHubCommitDetail) => {
     if (!repo || isGeneratingAiDoc) return;
     setIsGeneratingAiDoc(true);
+    setAiDocErrors((prev) => {
+      const next = { ...prev };
+      delete next[commitDetail.sha];
+      return next;
+    });
 
     try {
       const doc = await explainCommitWithAI({
@@ -160,10 +166,55 @@ export function GitHubActivityPanel({
         [commitDetail.sha]: doc,
       }));
     } catch (err: any) {
-      console.warn('Failed to generate commit AI doc:', err);
+      const errMsg = err.message || 'Failed to generate commit explanation with AI';
+      console.warn('Failed to generate commit AI doc:', errMsg);
+      setAiDocErrors((prev) => ({
+        ...prev,
+        [commitDetail.sha]: errMsg,
+      }));
     } finally {
       setIsGeneratingAiDoc(false);
     }
+  };
+
+  const generateLocalSummaryDoc = (commitDetail: GitHubCommitDetail) => {
+    const filesList = (commitDetail.files || [])
+      .map(
+        (f) =>
+          `- **\`${f.filename}\`** (${f.status}, <span style="color:#34d399">+${f.additions}</span> / <span style="color:#f87171">-${f.deletions}</span>)`
+      )
+      .join('\n');
+
+    const fallbackMarkdown = `# 📌 Commit Explanation: \`${commitDetail.sha.slice(0, 7)}\`
+
+## 🎯 Commit Purpose (Kyu kiya gaya change)
+**Message**: ${commitDetail.commit.message}
+**Author**: ${commitDetail.commit.author.name} (${new Date(commitDetail.commit.author.date).toLocaleString()})
+
+## 📂 Files Modified (${commitDetail.files?.length || 0} files)
+${filesList || 'No file changes recorded.'}
+
+## 📊 Summary of Code Modifications
+- **Total Changes**: ${commitDetail.stats?.total || 0} lines
+- **Additions**: +${commitDetail.stats?.additions || 0}
+- **Deletions**: -${commitDetail.stats?.deletions || 0}
+
+*Note: Generated using local Git diff inspection.*`;
+
+    setAiDocs((prev) => ({
+      ...prev,
+      [commitDetail.sha]: {
+        sha: commitDetail.sha,
+        commitMessage: commitDetail.commit.message,
+        authorName: commitDetail.commit.author.name,
+        purpose: commitDetail.commit.message,
+        filesSummary: `${commitDetail.files?.length || 0} files modified`,
+        codeChanges: `+${commitDetail.stats?.additions || 0} / -${commitDetail.stats?.deletions || 0}`,
+        impact: 'Repository source modification',
+        fullMarkdown: fallbackMarkdown,
+        createdAt: Date.now(),
+      },
+    }));
   };
 
   const handleCopy = (text: string) => {
@@ -503,16 +554,56 @@ export function GitHubActivityPanel({
                       </ReactMarkdown>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
-                      <p className="text-xs text-slate-400">No AI document generated yet.</p>
-                      <button
-                        type="button"
-                        onClick={() => generateAiExplanation(selectedCommitDetail)}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Generate AI Explanation</span>
-                      </button>
+                    <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
+                      {selectedCommitSha && aiDocErrors[selectedCommitSha] ? (
+                        <div className="w-full p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-left space-y-2">
+                          <div className="flex items-center gap-1.5 text-rose-300 font-semibold text-xs">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                            <span>AI Commit Explanation Error</span>
+                          </div>
+                          <p className="text-[11px] text-rose-200/90 leading-relaxed break-words">
+                            {aiDocErrors[selectedCommitSha]}
+                          </p>
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => generateAiExplanation(selectedCommitDetail)}
+                              className="px-2.5 py-1 rounded-md bg-rose-700 hover:bg-rose-600 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              <span>Retry with Gemini</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateLocalSummaryDoc(selectedCommitDetail)}
+                              className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold cursor-pointer"
+                            >
+                              Quick Local Doc
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-slate-400">No AI document generated yet.</p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => generateAiExplanation(selectedCommitDetail)}
+                              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Generate AI Explanation</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => generateLocalSummaryDoc(selectedCommitDetail)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                            >
+                              Quick Doc
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

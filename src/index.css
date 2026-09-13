@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
-/* VS Code & GitHub Dark Syntax Highlighting Theme */
+/* ==========================================================================
+   VS CODE & GITHUB DARK+ VIBRANT SYNTAX HIGHLIGHTING THEME
+   ========================================================================== */
+
 pre[class*="language-"],
-code[class*="language-"] {
-  color: #e2e8f0;
+code[class*="language-"],
+.code-syntax-viewer,
+.code-syntax-viewer code {
+  color: #d4d4d4;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   direction: ltr;
   text-align: left;
@@ -15,64 +20,92 @@ code[class*="language-"] {
   hyphens: none;
 }
 
-/* Tokens */
+/* Comments: VS Code Forest Green */
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  color: #6a9955;
+  color: #6a9955 !important;
   font-style: italic;
 }
 
+/* Punctuation & Delimiters: VS Code Slate Grey */
 .token.punctuation {
-  color: #94a3b8;
+  color: #d4d4d4 !important;
 }
 
 .token.namespace {
-  opacity: 0.7;
+  opacity: 0.8;
+  color: #4ec9b0 !important;
 }
 
+/* Properties & Attributes: VS Code Light Sky Blue */
 .token.property,
-.token.tag,
+.token.attr-name {
+  color: #9cdcfe !important;
+}
+
+/* HTML / JSX Tags: VS Code Blue */
+.token.tag {
+  color: #569cd6 !important;
+}
+
+/* Numbers, Booleans, Units: VS Code Sage / Light Mint */
 .token.boolean,
-.token.number,
+.token.number {
+  color: #b5cea8 !important;
+}
+
+/* Constants & Enums: VS Code Bright Cyan */
 .token.constant,
 .token.symbol {
-  color: #4ade80;
+  color: #4fc1ff !important;
 }
 
-.token.selector,
-.token.attr-name,
+/* Strings, Characters, Attribute Values: VS Code Terracotta Orange */
 .token.string,
 .token.char,
-.token.builtin {
-  color: #f6ad55;
+.token.attr-value {
+  color: #ce9178 !important;
 }
 
+/* Builtins & Type Names: VS Code Emerald Teal */
+.token.builtin,
+.token.class-name,
+.token.maybe-class-name {
+  color: #4ec9b0 !important;
+  font-weight: 500;
+}
+
+/* Operators: VS Code Neutral Silver */
 .token.operator,
 .token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-  color: #38bdf8;
+.token.url {
+  color: #d4d4d4 !important;
 }
 
+/* Keywords (const, let, import, export, return, if, function): VS Code Vibrant Violet/Magenta */
 .token.atrule,
-.token.attr-value,
 .token.keyword {
-  color: #c084fc;
+  color: #c586c0 !important;
   font-weight: 600;
 }
 
-.token.function,
-.token.class-name {
-  color: #facc15;
+/* Function Calls & Declarations: VS Code Radiant Yellow/Gold */
+.token.function {
+  color: #dcdcaa !important;
 }
 
+/* Variables & Parameters: VS Code Soft Blue */
+.token.variable,
+.token.parameter {
+  color: #9cdcfe !important;
+}
+
+/* Regular Expressions & Important Tokens */
 .token.regex,
-.token.important,
-.token.variable {
-  color: #38bdf8;
+.token.important {
+  color: #d16969 !important;
 }
 
 .token.important,
@@ -88,20 +121,20 @@ code[class*="language-"] {
   cursor: help;
 }
 
-/* Diff tokens */
+/* Git Diff Highlighting */
 .token.inserted,
 .diff-line-added {
-  color: #4ade80;
+  color: #4ade80 !important;
   background-color: rgba(34, 197, 94, 0.15);
 }
 
 .token.deleted,
 .diff-line-removed {
-  color: #f87171;
+  color: #f87171 !important;
   background-color: rgba(239, 68, 68, 0.15);
 }
 
 .diff-line-chunk {
-  color: #93c5fd;
+  color: #93c5fd !important;
   background-color: rgba(59, 130, 246, 0.1);
 }

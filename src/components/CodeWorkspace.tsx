@@ -378,11 +378,13 @@ export function CodeWorkspace({
 
                 {/* VIEW MODE 1: COLORFUL VS CODE / GITHUB SYNTAX HIGHLIGHTING */}
                 {codeDisplayMode === 'syntax' && (
-                  <div className="flex-1 overflow-auto bg-[#18181b] flex font-mono text-xs leading-relaxed selection:bg-blue-600 selection:text-white">
+                  <div className="flex-1 overflow-auto bg-[#1e1e1e] flex font-mono text-xs leading-relaxed selection:bg-[#264f78] selection:text-white code-syntax-viewer">
                     {/* Line numbers gutter */}
-                    <div className="select-none py-4 px-3 text-right text-slate-600 bg-[#141416] border-r border-slate-800/60 shrink-0 font-mono text-xs leading-relaxed space-y-0">
+                    <div className="select-none py-4 px-3 text-right text-[#858585] bg-[#1e1e1e] border-r border-[#2d2d2d] shrink-0 font-mono text-xs leading-relaxed space-y-0 min-w-[48px]">
                       {Array.from({ length: codeLineCount }, (_, i) => (
-                        <div key={i + 1}>{i + 1}</div>
+                        <div key={i + 1} className="hover:text-slate-300">
+                          {i + 1}
+                        </div>
                       ))}
                     </div>
 

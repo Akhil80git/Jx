@@ -421,7 +421,7 @@ Format as a pristine Markdown document with headers, bold text, bullet points, a
 
       const response = await executeGeminiWithRetry(() =>
         ai.models.generateContent({
-          model: "gemini-3.5-flash-lite",
+          model: "gemini-3.8-flash",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
             systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in bilingual clear English/Hinglish.",
@@ -509,7 +509,7 @@ Return the response in the following EXACT JSON format:
 
       const response = await executeGeminiWithRetry(() =>
         ai.models.generateContent({
-          model: "gemini-3.5-flash-lite",
+          model: "gemini-3.8-flash",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
             systemInstruction: "You are an elite technical documentation writer and principal system architect. Deliver large, rich, production-grade technical documents with pristine markdown formatting.",
@@ -624,7 +624,7 @@ IMPORTANT: Include EVERY endpoint and summarize the purpose of files in "filesSu
 
       const response = await executeGeminiWithRetry(() =>
         ai.models.generateContent({
-          model: "gemini-3.5-flash-lite",
+          model: "gemini-3.8-flash",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: {
             systemInstruction: "You are an expert software architect and technical writer. Provide precise, accurate, and structured insights about repositories.",
@@ -723,7 +723,7 @@ Your response MUST be in this JSON structure:
       try {
         const response = await executeGeminiWithRetry(() =>
           ai.models.generateContent({
-            model: "gemini-3.5-flash-lite",
+            model: "gemini-3.8-flash",
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
               systemInstruction: "You are a senior code analyst. Create structured, high-clarity markdown documentation for source code files.",
@@ -778,13 +778,13 @@ Your response MUST be in this JSON structure:
         });
       }
 
-      const { messages, model = "gemini-3.5-flash-lite", systemInstruction } = req.body;
+      const { messages, model = "gemini-3.8-flash", systemInstruction } = req.body;
 
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
         return res.status(400).json({ error: "Messages array is required." });
       }
 
-      const chosenModel = "gemini-3.5-flash-lite";
+      const chosenModel = "gemini-3.8-flash";
 
       const ai = new GoogleGenAI({
         apiKey: effectiveKey.trim(),
@@ -813,7 +813,7 @@ Your response MUST be in this JSON structure:
         config: {
           systemInstruction:
             systemInstruction ||
-            "You are a helpful, knowledgeable, and polite AI assistant powered by Google Gemini 3.5 Flash-Lite. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.",
+            "You are a helpful, knowledgeable, and polite AI assistant powered by Google Gemini 3.8 Flash. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.",
         },
       });
 

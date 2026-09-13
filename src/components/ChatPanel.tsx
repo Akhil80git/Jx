@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   MessageSquare,
   Sparkles,
@@ -8,6 +8,13 @@ import {
   Compass,
   RefreshCw,
   Zap,
+  Layers,
+  Plus,
+  X,
+  Search,
+  Check,
+  HardDrive,
+  FileText,
 } from 'lucide-react';
 import {
   ChatMessage,
@@ -16,17 +23,27 @@ import {
   FileAnalysisDoc,
   ChatHubTab,
   GitHubRepo,
+  GitHubTreeItem,
+  FIXED_MODEL,
 } from '../types';
 import { ChatInput } from './ChatInput';
 import { EmptyState } from './EmptyState';
 import { ChatMessageItem } from './ChatMessageItem';
 import { RepoArchitectureViewer } from './RepoArchitectureViewer';
-import { getPayloadAnalytics } from '../utils/tokenCalc';
+import { getPayloadAnalytics, formatByteSize } from '../utils/tokenCalc';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   isStreaming: boolean;
-  onSendMessage: (text: string, options?: { mode?: 'chat' | 'code'; includeFile?: boolean }) => void;
+  onSendMessage: (
+    text: string,
+    options?: {
+      mode?: 'chat' | 'code';
+      includeFile?: boolean;
+      useMultiFiles?: boolean;
+      selectedFilePaths?: string[];
+    }
+  ) => void;
   onStopStreaming: () => void;
   hasKeyReady: boolean;
   onOpenApiKeyModal: () => void;
@@ -35,6 +52,15 @@ interface ChatPanelProps {
   onDraftChange: (analytics: ReturnType<typeof getPayloadAnalytics> | null) => void;
   isOpen: boolean;
   onToggle: () => void;
+
+  // Multi-File selection props
+  treeItems: GitHubTreeItem[];
+  selectedChatFilePaths: string[];
+  onToggleChatFile: (path: string) => void;
+  onClearChatFiles: () => void;
+  onSelectAllChatFiles: (paths: string[]) => void;
+  isMultiFileMode: boolean;
+  onToggleMultiFileMode: () => void;
 
   // Automated Repo Analysis Props
   selectedRepo: GitHubRepo | null;
@@ -63,6 +89,13 @@ export function ChatPanel({
   onDraftChange,
   isOpen,
   onToggle,
+  treeItems,
+  selectedChatFilePaths,
+  onToggleChatFile,
+  onClearChatFiles,
+  onSelectAllChatFiles,
+  isMultiFileMode,
+  onToggleMultiFileMode,
   selectedRepo,
   repoAnalysisState,
   onSelectFileDocPath,
@@ -73,6 +106,8 @@ export function ChatPanel({
   const [activeHubTab, setActiveHubTab] = useState<ChatHubTab>('architecture');
   const [chatMode, setChatMode] = useState<'chat' | 'code'>('chat');
   const [attachFileContext, setAttachFileContext] = useState<boolean>(true);
+  const [isPickerOpen, setIsPickerOpen] = useState<boolean>(false);
+  const [pickerSearch, setPickerSearch] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,10 +116,32 @@ export function ChatPanel({
     }
   }, [messages, isStreaming, activeHubTab]);
 
+  // Filter repository files for the picker dialog
+  const repoFilesOnly = useMemo(() => {
+    return treeItems.filter((item) => item.type === 'blob');
+  }, [treeItems]);
+
+  const filteredPickerFiles = useMemo(() => {
+    if (!pickerSearch.trim()) return repoFilesOnly;
+    const q = pickerSearch.toLowerCase();
+    return repoFilesOnly.filter((f) => f.path.toLowerCase().includes(q));
+  }, [repoFilesOnly, pickerSearch]);
+
+  // Calculate estimated tokens for selected files
+  const estimatedAttachedTokens = useMemo(() => {
+    const totalBytes = selectedChatFilePaths.reduce((acc, path) => {
+      const item = treeItems.find((t) => t.path === path);
+      return acc + (item?.size || 1000);
+    }, 0);
+    return Math.round(totalBytes / 4);
+  }, [selectedChatFilePaths, treeItems]);
+
   const handleSend = (text: string) => {
     onSendMessage(text, {
       mode: chatMode,
-      includeFile: attachFileContext && Boolean(activeFile),
+      includeFile: !isMultiFileMode && attachFileContext && Boolean(activeFile),
+      useMultiFiles: isMultiFileMode && selectedChatFilePaths.length > 0,
+      selectedFilePaths: selectedChatFilePaths,
     });
   };
 
@@ -186,50 +243,296 @@ export function ChatPanel({
 
         {/* VIEW 3: Interactive Chat Assistant & Code Studio */}
         {activeHubTab === 'chat' && (
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
+          <div className="flex-1 flex flex-col h-full overflow-hidden relative">
             {/* Chat sub-controls */}
-            <div className="p-2 border-b border-slate-800/60 bg-slate-900/30 flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setChatMode('chat')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                    chatMode === 'chat'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Chat Q&A
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChatMode('code')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                    chatMode === 'code'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-900 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Code Studio
-                </button>
+            <div className="p-2 border-b border-slate-800/60 bg-slate-900/40 space-y-1.5">
+              <div className="flex items-center justify-between gap-1 flex-wrap">
+                {/* Mode toggle */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setChatMode('chat')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                      chatMode === 'chat'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Chat Q&A
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatMode('code')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+                      chatMode === 'code'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Code Studio
+                  </button>
+                </div>
+
+                {/* File Context Mode Switch: Single File vs Multi-File */}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  {/* Multi-File Mode Toggle Switch */}
+                  <button
+                    id="toggle-multi-file-chat-btn"
+                    type="button"
+                    onClick={onToggleMultiFileMode}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isMultiFileMode
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                    }`}
+                    title={
+                      isMultiFileMode
+                        ? 'Multi-File context is active. Click to switch to single file.'
+                        : 'Turn ON to select multiple files for chat.'
+                    }
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>Multi-File</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
+                        selectedChatFilePaths.length > 0
+                          ? isMultiFileMode
+                            ? 'bg-emerald-800 text-white'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {selectedChatFilePaths.length}
+                    </span>
+                  </button>
+
+                  {/* If in Multi-File mode: "+ Pick Files" button */}
+                  {isMultiFileMode && (
+                    <button
+                      id="open-file-picker-btn"
+                      type="button"
+                      onClick={() => setIsPickerOpen(true)}
+                      className="px-2 py-1 rounded-md text-[11px] font-semibold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1 cursor-pointer shadow-xs"
+                      title="Select files from repo"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Attach Files</span>
+                    </button>
+                  )}
+
+                  {/* If NOT in multi-file mode: show active file attach toggle */}
+                  {!isMultiFileMode && activeFile && (
+                    <button
+                      type="button"
+                      onClick={() => setAttachFileContext(!attachFileContext)}
+                      className={`px-2 py-1 rounded text-[10px] font-mono transition-colors cursor-pointer flex items-center gap-1 ${
+                        attachFileContext
+                          ? 'bg-blue-950 text-blue-300 border border-blue-800/60'
+                          : 'bg-slate-900 text-slate-500 border border-slate-800'
+                      }`}
+                      title={attachFileContext ? 'Active file attached' : 'Click to attach active file'}
+                    >
+                      <FileCode className="w-3 h-3 text-blue-400" />
+                      <span className="truncate max-w-[100px]">{activeFile.name}</span>
+                      <span>{attachFileContext ? '✓' : '+'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {activeFile && (
-                <button
-                  type="button"
-                  onClick={() => setAttachFileContext(!attachFileContext)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer flex items-center gap-1 ${
-                    attachFileContext
-                      ? 'bg-blue-950 text-blue-300 border border-blue-800/60'
-                      : 'bg-slate-900 text-slate-500 border border-slate-800'
-                  }`}
-                >
-                  <FileCode className="w-3 h-3 text-blue-400" />
-                  <span>{activeFile.name}</span>
-                  <span>{attachFileContext ? '✓' : '+'}</span>
-                </button>
+              {/* Multi-File Attached Chips Bar */}
+              {isMultiFileMode && (
+                <div className="pt-1.5 border-t border-slate-800/60 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 flex items-center gap-1 font-medium">
+                      <HardDrive className="w-3 h-3 text-emerald-400" />
+                      <span>
+                        Attached Files ({selectedChatFilePaths.length}):
+                      </span>
+                      {selectedChatFilePaths.length > 0 && (
+                        <span className="text-emerald-400 font-mono text-[10px]">
+                          ~{estimatedAttachedTokens.toLocaleString()} tokens
+                        </span>
+                      )}
+                    </span>
+
+                    {selectedChatFilePaths.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={onClearChatFiles}
+                        className="text-slate-400 hover:text-rose-400 text-[10px] cursor-pointer underline"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedChatFilePaths.length === 0 ? (
+                    <div className="p-2 rounded-lg bg-slate-900/60 border border-dashed border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                      <span>No files attached yet. Choose files to chat with multiple files together.</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsPickerOpen(true)}
+                        className="text-indigo-400 hover:text-indigo-300 font-medium underline ml-2 cursor-pointer shrink-0"
+                      >
+                        Choose files
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
+                      {selectedChatFilePaths.map((path) => {
+                        const fileName = path.split('/').pop() || path;
+                        return (
+                          <span
+                            key={path}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-700/60 text-emerald-200 text-[11px] font-mono group"
+                          >
+                            <FileCode className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span className="truncate max-w-[140px]" title={path}>
+                              {fileName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onToggleChatFile(path)}
+                              className="text-emerald-400/80 hover:text-rose-300 ml-0.5 cursor-pointer"
+                              title={`Remove ${fileName}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
+
+            {/* Quick File Selector Modal / Drawer for Chat Context */}
+            {isPickerOpen && (
+              <div
+                id="file-picker-modal"
+                className="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md flex flex-col p-3 animate-in fade-in duration-150"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-emerald-400" />
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Attach Files for AI Chat</h4>
+                      <p className="text-[10px] text-slate-400">
+                        Select multiple files to analyze logic across files in one chat
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPickerOpen(false)}
+                    className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Search & Bulk Select Controls */}
+                <div className="py-2 space-y-1.5">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={pickerSearch}
+                      onChange={(e) => setPickerSearch(e.target.value)}
+                      placeholder="Search repository files..."
+                      className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] px-1">
+                    <span className="text-slate-400">
+                      Showing {filteredPickerFiles.length} of {repoFilesOnly.length} files
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allPaths = filteredPickerFiles.map((f) => f.path);
+                          onSelectAllChatFiles(allPaths);
+                        }}
+                        className="text-indigo-400 hover:text-indigo-300 font-medium cursor-pointer"
+                      >
+                        Select all visible
+                      </button>
+                      <span className="text-slate-700">•</span>
+                      <button
+                        type="button"
+                        onClick={onClearChatFiles}
+                        className="text-slate-400 hover:text-rose-400 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* File Items List */}
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-900 rounded-lg border border-slate-800/80 bg-slate-900/40 p-1">
+                  {filteredPickerFiles.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-500">
+                      No files matching "{pickerSearch}"
+                    </div>
+                  ) : (
+                    filteredPickerFiles.map((file) => {
+                      const isSelected = selectedChatFilePaths.includes(file.path);
+                      return (
+                        <div
+                          key={file.path}
+                          onClick={() => onToggleChatFile(file.path)}
+                          className={`flex items-center justify-between p-2 rounded-md transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-950/40 text-emerald-200 border border-emerald-800/50'
+                              : 'hover:bg-slate-800/60 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => onToggleChatFile(file.path)}
+                              className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-emerald-500 accent-emerald-500 cursor-pointer shrink-0"
+                            />
+                            <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                            <span className="text-xs font-mono truncate">{file.path}</span>
+                          </div>
+                          {typeof file.size === 'number' && (
+                            <span className="text-[10px] text-slate-500 font-mono shrink-0 ml-2">
+                              {formatByteSize(file.size)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Bottom Done Bar */}
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between mt-2">
+                  <div className="text-xs text-slate-300">
+                    <strong className="text-emerald-400">{selectedChatFilePaths.length}</strong> files selected
+                    {selectedChatFilePaths.length > 0 && (
+                      <span className="text-slate-500 ml-1">
+                        (~{estimatedAttachedTokens.toLocaleString()} tokens)
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPickerOpen(false)}
+                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Messages Scroll Area */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -258,7 +561,7 @@ export function ChatPanel({
               onStopStreaming={onStopStreaming}
               hasKeyReady={hasKeyReady}
               onOpenApiKeyModal={onOpenApiKeyModal}
-              selectedModelName="Gemini 3.5 Flash-Lite"
+              selectedModelName={FIXED_MODEL.name}
               onDraftChange={onDraftChange}
             />
           </div>

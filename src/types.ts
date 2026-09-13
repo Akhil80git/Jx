@@ -21,11 +21,19 @@ export interface ChatMessage {
 }
 
 export const FIXED_MODEL = {
-  id: 'gemini-3.5-flash-lite',
-  name: 'Gemini 3.5 Flash-Lite',
+  id: 'gemini-3.8-flash',
+  name: 'Gemini 3.8 Flash',
   badge: 'Active Model',
-  description: 'Ultra-low latency lightweight model from the Gemini 3.5 family',
+  description: 'High-speed, powerful reasoning and coding model from Google Gemini',
 };
+
+export interface AttachedChatFile {
+  path: string;
+  name: string;
+  content?: string;
+  size?: number;
+  language?: string;
+}
 
 export interface GitHubRepo {
   id: number;
