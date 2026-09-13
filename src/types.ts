@@ -130,7 +130,7 @@ export interface RepoAnalysisState {
 
 export type CenterTab = 'code' | 'docs' | 'preview';
 export type DocsSubTab = 'overview' | 'endpoints' | 'structure' | 'features';
-export type ChatHubTab = 'file_docs' | 'architecture' | 'activity' | 'chat';
+export type ChatHubTab = 'architecture' | 'activity' | 'chat';
 
 export interface DeepScanDocs {
   projectOverview: string; // Doc 1: Kyu ban raha hai & deep overview

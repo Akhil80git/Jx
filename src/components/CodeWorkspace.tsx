@@ -9,13 +9,11 @@ import {
   Play,
   Sparkles,
   RefreshCw,
-  Layers,
   Network,
   Cpu,
   Zap,
   Edit3,
   Eye,
-  FileCheck2,
   FolderTree,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -25,13 +23,12 @@ import {
   GeneratedDocs,
   CenterTab,
   RepoArchitectureDoc,
-  FileAnalysisDoc,
   DeepScanDocs,
 } from '../types';
 import { formatByteSize, calculateByteSize } from '../utils/tokenCalc';
 import { highlightCode, getPrismLanguage } from '../utils/syntaxHighlight';
 
-export type Docs4Tab = 'overview' | 'endpoints' | 'structure' | 'features' | 'file_md';
+export type Docs4Tab = 'overview' | 'endpoints' | 'structure' | 'features';
 
 interface CodeWorkspaceProps {
   activeFile: ActiveFile | null;
@@ -45,7 +42,6 @@ interface CodeWorkspaceProps {
   activeCenterTab: CenterTab;
   onChangeCenterTab: (tab: CenterTab) => void;
   architectureDoc?: RepoArchitectureDoc | null;
-  activeFileDoc?: FileAnalysisDoc | null;
   onOpenFileInEditor?: (filePath: string) => void;
 }
 
@@ -61,7 +57,6 @@ export function CodeWorkspace({
   activeCenterTab,
   onChangeCenterTab,
   architectureDoc,
-  activeFileDoc,
   onOpenFileInEditor,
 }: CodeWorkspaceProps) {
   const [copiedCode, setCopiedCode] = useState(false);
@@ -131,12 +126,8 @@ export function CodeWorkspace({
       deepScanDocs?.featuresCatalog ||
       `# ⚡ Features & Capabilities Catalog\nClick **Run Full Project Deep Scan** to generate full feature inventory.`;
 
-    const fileMd =
-      activeFileDoc?.mdContent ||
-      `# 📂 File Analysis: ${activeFile?.name || 'No file selected'}\n\nSelect a file from the repository tree to inspect its complete breakdown.`;
-
-    return { overview, endpoints, structure, features, fileMd };
-  }, [deepScanDocs, architectureDoc, generatedDocs, activeFileDoc, activeFile]);
+    return { overview, endpoints, structure, features };
+  }, [deepScanDocs, architectureDoc, generatedDocs]);
 
   // Current active doc string
   const currentDocContent = useMemo(() => {
@@ -149,8 +140,6 @@ export function CodeWorkspace({
         return docContents.structure;
       case 'features':
         return docContents.features;
-      case 'file_md':
-        return docContents.fileMd;
       default:
         return docContents.overview;
     }
@@ -166,10 +155,8 @@ export function CodeWorkspace({
         return 'structure-architecture.md';
       case 'features':
         return 'features-catalog.md';
-      case 'file_md':
-        return `${activeFileDoc?.name || 'file'}-analysis.md`;
     }
-  }, [activeDocSubTab, activeFileDoc]);
+  }, [activeDocSubTab]);
 
   // Syntax highlighted HTML with line numbers
   const highlightedCodeHtml = useMemo(() => {
@@ -430,7 +417,7 @@ export function CodeWorkspace({
                 <FileCode className="w-10 h-10 text-slate-700 mb-2" />
                 <h4 className="text-sm font-semibold text-slate-300">No file opened in editor</h4>
                 <p className="text-xs max-w-sm">
-                  Select a file from the repository tree on the left or click any file in the File MDs view to inspect and edit its code.
+                  Select a file from the repository tree on the left to inspect, highlight, and edit its source code.
                 </p>
               </div>
             )}
@@ -497,20 +484,6 @@ export function CodeWorkspace({
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-400" />
                   <span>4. Features Catalog</span>
-                </button>
-
-                {/* Extra Sub-tab: File MD */}
-                <button
-                  type="button"
-                  onClick={() => setActiveDocSubTab('file_md')}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
-                    activeDocSubTab === 'file_md'
-                      ? 'border-indigo-500 text-indigo-300 bg-slate-900/80'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5 text-purple-400" />
-                  <span>File MD ({activeFileDoc?.name || 'Selected File'})</span>
                 </button>
               </div>
 

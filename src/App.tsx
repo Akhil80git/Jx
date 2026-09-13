@@ -574,10 +574,6 @@ export default function App() {
     return acc + (msg.tokenUsage ? msg.tokenUsage.totalTokens : 0);
   }, 0);
 
-  const currentActiveFileDoc = repoAnalysisState.activeFileDocPath
-    ? repoAnalysisState.fileDocs[repoAnalysisState.activeFileDocPath]
-    : null;
-
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 antialiased overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
       {/* Top Header */}
@@ -646,7 +642,6 @@ export default function App() {
           generatedDocs={generatedDocs}
           deepScanDocs={deepScanDocs}
           architectureDoc={repoAnalysisState.architectureDoc}
-          activeFileDoc={currentActiveFileDoc}
           onTriggerDeepScan={handleTriggerDeepScan}
           onAskGeminiAboutFile={(prompt) => {
             setIsChatOpen(true);
@@ -658,7 +653,7 @@ export default function App() {
           onOpenFileInEditor={(path) => handleSelectFile(path)}
         />
 
-        {/* Pane 4: Gemini 3.5 AI Hub (Dual Vertical: File MDs + Architecture & Endpoints + Chat) */}
+        {/* Pane 4: Gemini 3.5 AI Hub (Dual Vertical: Architecture & Endpoints + Chat) */}
         <ChatPanel
           messages={messages}
           isStreaming={isStreaming}

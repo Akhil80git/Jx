@@ -8,7 +8,6 @@ import {
 } from '../types';
 import { fetchRepoFile, runUnifiedProjectDeepScan } from './apiClient';
 import { isPathIgnored } from '../utils/gitignore';
-import { analyzeSourceFileLocally } from '../utils/codeAnalysis';
 
 export interface AutoAnalysisOptions {
   repo: GitHubRepo;
@@ -61,23 +60,17 @@ export async function runAutoRepoAnalysis(options: AutoAnalysisOptions): Promise
 
   const totalFiles = validBlobItems.length;
 
-  // 2. Initialize instantaneous local AST/heuristic docs for ALL files
   const fileDocs: Record<string, FileAnalysisDoc> = {};
   const cachedContents: Record<string, string> = {};
-
-  validBlobItems.forEach((item) => {
-    const initialDoc = analyzeSourceFileLocally(item.path, '', item.size);
-    fileDocs[item.path] = initialDoc;
-  });
 
   onProgress?.({
     repoFullName: repo.full_name,
     isAnalyzing: true,
     currentStep: 'analyzing_architecture',
     statusMessage: `Scanning entire project (${totalFiles} files) together with AI...`,
-    progress: { current: 0, total: totalFiles },
-    fileDocs: { ...fileDocs },
-    activeFileDocPath: validBlobItems[0]?.path || null,
+    progress: { current: 1, total: 2 },
+    fileDocs: {},
+    activeFileDocPath: null,
   });
 
   // 3. Fetch key structural and representative files for rich architectural context
@@ -111,10 +104,6 @@ export async function runAutoRepoAnalysis(options: AutoAnalysisOptions): Promise
         if (fileData && fileData.content) {
           cachedContents[match.path] = fileData.content;
           sampleFilesContent += `\n--- FILE: ${match.path} ---\n${fileData.content.slice(0, 3500)}\n`;
-
-          const richDoc = analyzeSourceFileLocally(match.path, fileData.content, match.size);
-          fileDocs[match.path] = richDoc;
-          onFileDocComplete?.(richDoc);
         }
       } catch {
         // non-fatal
@@ -204,64 +193,20 @@ export async function runAutoRepoAnalysis(options: AutoAnalysisOptions): Promise
   }
 
   onArchitectureComplete?.(architectureDoc);
-  onProgress?.({
-    architectureDoc,
-    fileDocs: { ...fileDocs },
-    currentStep: 'analyzing_files',
-    statusMessage: `Generating file Markdown breakdowns for all ${totalFiles} files...`,
-  });
-
-  // 5. Enrich all source files locally (fast, zero rate-limit impact, handles all 20, 50, 100+ files!)
-  let completedCount = 0;
-
-  for (const item of validBlobItems) {
-    if (signal?.aborted) break;
-
-    try {
-      let content = cachedContents[item.path];
-      if (content === undefined && item.size && item.size < 50000) {
-        // Only prefetch moderate sized files to keep network fast
-        try {
-          const fetched = await fetchRepoFile(repo.owner.login, repo.name, item.path, branch, githubToken);
-          content = fetched.content || '';
-          cachedContents[item.path] = content;
-        } catch {
-          content = '';
-        }
-      }
-
-      const localDoc = analyzeSourceFileLocally(item.path, content || '', item.size);
-      fileDocs[item.path] = localDoc;
-      onFileDocComplete?.(localDoc);
-    } catch {
-      // non-fatal
-    }
-
-    completedCount++;
-    if (completedCount % 5 === 0 || completedCount === totalFiles) {
-      onProgress?.({
-        fileDocs: { ...fileDocs },
-        progress: { current: completedCount, total: totalFiles },
-      });
-    }
-
-    // Smooth UI breathing space
-    await new Promise((res) => setTimeout(res, 10));
-  }
 
   // Final completion update
   onProgress?.({
     isAnalyzing: false,
     currentStep: 'completed',
-    statusMessage: `Completed Deep Scan: 4 comprehensive documents & all ${totalFiles} file docs ready!`,
-    progress: { current: totalFiles, total: totalFiles },
-    fileDocs: { ...fileDocs },
+    statusMessage: `Completed Deep Scan: Project Overview, Endpoints & Architecture ready!`,
+    progress: { current: 1, total: 1 },
+    fileDocs: {},
     architectureDoc,
   });
 
   return {
     architectureDoc,
-    fileDocs,
+    fileDocs: {},
     deepScanDocs: deepDocs,
   };
 }

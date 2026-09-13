@@ -5,7 +5,6 @@ import {
   Code2,
   ChevronRight,
   FileCode,
-  Layers,
   Compass,
   RefreshCw,
   Zap,
@@ -21,7 +20,6 @@ import {
 import { ChatInput } from './ChatInput';
 import { EmptyState } from './EmptyState';
 import { ChatMessageItem } from './ChatMessageItem';
-import { RepoFileDocsViewer } from './RepoFileDocsViewer';
 import { RepoArchitectureViewer } from './RepoArchitectureViewer';
 import { getPayloadAnalytics } from '../utils/tokenCalc';
 
@@ -71,8 +69,8 @@ export function ChatPanel({
   onOpenInEditor,
   onTriggerReAnalysis,
 }: ChatPanelProps) {
-  // Hub Mode Tab: File MD Docs vs Full Architecture/Endpoints vs Interactive Chat
-  const [activeHubTab, setActiveHubTab] = useState<ChatHubTab>('file_docs');
+  // Hub Mode Tab: Full Architecture/Endpoints vs Interactive Chat
+  const [activeHubTab, setActiveHubTab] = useState<ChatHubTab>('architecture');
   const [chatMode, setChatMode] = useState<'chat' | 'code'>('chat');
   const [attachFileContext, setAttachFileContext] = useState<boolean>(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -83,13 +81,6 @@ export function ChatPanel({
     }
   }, [messages, isStreaming, activeHubTab]);
 
-  // When a new repo starts analyzing, default to file docs or architecture
-  useEffect(() => {
-    if (repoAnalysisState.isAnalyzing && activeHubTab === 'chat' && messages.length === 0) {
-      setActiveHubTab('file_docs');
-    }
-  }, [repoAnalysisState.isAnalyzing]);
-
   const handleSend = (text: string) => {
     onSendMessage(text, {
       mode: chatMode,
@@ -97,25 +88,14 @@ export function ChatPanel({
     });
   };
 
-  const handleAskAboutFile = (filePath: string, prompt: string) => {
-    setActiveHubTab('chat');
-    onSendMessage(`Regarding file "${filePath}": ${prompt}`, {
-      mode: 'chat',
-      includeFile: true,
-    });
-  };
-
   if (!isOpen) return null;
-
-  const totalFilesCount = repoAnalysisState.progress.total || Object.keys(repoAnalysisState.fileDocs).length;
-  const analyzedFilesCount = repoAnalysisState.progress.current;
 
   return (
     <div
       id="gemini-chat-panel"
       className="w-full sm:w-[480px] md:w-[540px] lg:w-[600px] xl:w-[680px] shrink-0 bg-slate-950 flex flex-col h-full overflow-hidden border-l border-slate-800/80 relative z-20"
     >
-      {/* Panel Top Header with 3 Core Modes */}
+      {/* Panel Top Header with 2 Core Modes */}
       <div className="p-2.5 border-b border-slate-800/80 bg-slate-900/50">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -127,7 +107,7 @@ export function ChatPanel({
                 <span>Gemini 3.5 Repo Intelligence</span>
               </h3>
               <p className="text-[10px] text-slate-400 truncate">
-                {selectedRepo ? selectedRepo.full_name : 'Select a repo to auto-generate docs'}
+                {selectedRepo ? selectedRepo.full_name : 'Select a repo to inspect architecture'}
               </p>
             </div>
           </div>
@@ -142,32 +122,14 @@ export function ChatPanel({
           </button>
         </div>
 
-        {/* 3 Top Vertical / Workflow Tabs */}
-        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
-          {/* Tab 1: File MD Docs */}
-          <button
-            id="hub-tab-file-docs"
-            type="button"
-            onClick={() => setActiveHubTab('file_docs')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
-              activeHubTab === 'file_docs'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">File MDs ({totalFilesCount})</span>
-            {repoAnalysisState.isAnalyzing && (
-              <RefreshCw className="w-2.5 h-2.5 animate-spin text-indigo-300 ml-0.5 shrink-0" />
-            )}
-          </button>
-
-          {/* Tab 2: Architecture & Endpoints */}
+        {/* 2 Top Vertical Tabs: Architecture & Endpoints vs Interactive Chat */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80">
+          {/* Tab 1: Architecture & Endpoints */}
           <button
             id="hub-tab-architecture"
             type="button"
             onClick={() => setActiveHubTab('architecture')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
               activeHubTab === 'architecture'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
@@ -175,14 +137,17 @@ export function ChatPanel({
           >
             <Compass className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Architecture & Endpoints</span>
+            {repoAnalysisState.isAnalyzing && (
+              <RefreshCw className="w-2.5 h-2.5 animate-spin text-blue-200 ml-0.5 shrink-0" />
+            )}
           </button>
 
-          {/* Tab 3: Interactive Chat */}
+          {/* Tab 2: Interactive Chat */}
           <button
             id="hub-tab-chat"
             type="button"
             onClick={() => setActiveHubTab('chat')}
-            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
+            className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer truncate ${
               activeHubTab === 'chat'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
@@ -202,29 +167,14 @@ export function ChatPanel({
                 {repoAnalysisState.statusMessage || 'AI analyzing repository...'}
               </span>
             </div>
-            <span className="font-mono font-bold text-indigo-300 text-[10px] shrink-0">
-              {analyzedFilesCount}/{totalFilesCount || '?'} files
-            </span>
+            <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin shrink-0" />
           </div>
         )}
       </div>
 
       {/* Main Hub Body by Tab */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-        {/* VIEW 1: All Repo Files MD Docs */}
-        {activeHubTab === 'file_docs' && (
-          <RepoFileDocsViewer
-            fileDocs={repoAnalysisState.fileDocs}
-            activeFilePath={repoAnalysisState.activeFileDocPath}
-            onSelectFilePath={onSelectFileDocPath}
-            onOpenInEditor={onOpenInEditor}
-            onAskAiAboutFile={handleAskAboutFile}
-            isAnalyzing={repoAnalysisState.isAnalyzing}
-            progress={repoAnalysisState.progress}
-          />
-        )}
-
-        {/* VIEW 2: Complete Project Architecture & Endpoints Directory */}
+        {/* VIEW 1: Complete Project Architecture & Endpoints Directory */}
         {activeHubTab === 'architecture' && (
           <RepoArchitectureViewer
             architectureDoc={repoAnalysisState.architectureDoc}
