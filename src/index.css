@@ -121,6 +121,46 @@ code[class*="language-"],
   cursor: help;
 }
 
+/* Code Line Gutter & Row Styling */
+.code-line-row {
+  display: flex;
+  min-width: fit-content;
+  line-height: 1.625rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  transition: background-color 0.1s ease;
+}
+
+.code-line-row:hover {
+  background-color: rgba(30, 41, 59, 0.6);
+}
+
+.code-line-number {
+  user-select: none;
+  text-align: right;
+  padding-right: 1.25rem;
+  padding-left: 0.75rem;
+  color: #64748b;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(51, 65, 85, 0.5);
+  background-color: rgba(15, 23, 42, 0.4);
+}
+
+.code-line-content {
+  padding-left: 1.25rem;
+  padding-right: 1.5rem;
+  flex: 1;
+  white-space: pre;
+  color: #e2e8f0;
+}
+
+.code-line-content.wrap-enabled {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* Git Diff Highlighting */
 .token.inserted,
 .diff-line-added {
@@ -138,3 +178,4 @@ code[class*="language-"],
   color: #93c5fd !important;
   background-color: rgba(59, 130, 246, 0.1);
 }
+

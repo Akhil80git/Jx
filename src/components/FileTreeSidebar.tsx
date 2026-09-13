@@ -295,29 +295,6 @@ export function FileTreeSidebar({
           </div>
         )}
 
-        {/* AI Deep Scan Action Button */}
-        {repo && (
-          <button
-            id="ai-scan-repo-btn"
-            type="button"
-            onClick={onTriggerDeepScan}
-            disabled={isScanning || treeItems.length === 0}
-            className="w-full flex items-center justify-center gap-1.5 py-1 px-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-[11px] transition-all shadow-xs disabled:opacity-50 cursor-pointer mb-2"
-          >
-            {isScanning ? (
-              <>
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                <span>Scanning Repo...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                <span>AI Deep Scan & Docs</span>
-              </>
-            )}
-          </button>
-        )}
-
         {/* Multi-File AI Context Mode Switch */}
         {repo && (
           <div className="pt-1.5 border-t border-slate-800/80">

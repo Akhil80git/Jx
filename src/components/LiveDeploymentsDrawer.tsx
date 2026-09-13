@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Globe,
   ExternalLink,
   RefreshCw,
-  Copy,
-  Check,
   X,
   Smartphone,
   Tablet,
@@ -13,9 +11,6 @@ import {
   Trash2,
   Maximize2,
   Minimize2,
-  ShieldCheck,
-  Radio,
-  Layers,
 } from 'lucide-react';
 import { GitHubRepo, ProductionDeploymentItem } from '../types';
 import { fetchRepoDeployments } from '../services/apiClient';
@@ -39,10 +34,8 @@ export function LiveDeploymentsDrawer({
   const [selectedItem, setSelectedItem] = useState<ProductionDeploymentItem | null>(null);
   const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isLoading, setIsLoading] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isIframeLoaded, setIsIframeLoaded] = useState(false);
 
   // New Custom URL input
   const [isAddingCustom, setIsAddingCustom] = useState(false);
@@ -109,7 +102,6 @@ export function LiveDeploymentsDrawer({
 
       // 3. Fallback demo items if list is empty so user immediately experiences the feature
       if (items.length === 0 && selectedRepo) {
-        // e.g. generate predicted preview url for vercel or github pages
         const cleanName = selectedRepo.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
         const cleanOwner = selectedRepo.owner.login.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
@@ -151,12 +143,6 @@ export function LiveDeploymentsDrawer({
       isCancelled = true;
     };
   }, [isOpen, selectedRepo?.full_name, repos.length]);
-
-  const handleCopy = (url: string) => {
-    navigator.clipboard.writeText(url);
-    setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), 1500);
-  };
 
   const handleAddCustom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,37 +192,31 @@ export function LiveDeploymentsDrawer({
       case 'vercel':
         return {
           badgeClass: 'bg-black text-white border border-slate-700',
-          dotClass: 'bg-white',
           symbol: '▲',
         };
       case 'netlify':
         return {
           badgeClass: 'bg-teal-950/70 text-teal-300 border border-teal-700/60',
-          dotClass: 'bg-teal-400',
           symbol: '◆',
         };
       case 'github pages':
         return {
           badgeClass: 'bg-indigo-950/70 text-indigo-300 border border-indigo-700/60',
-          dotClass: 'bg-indigo-400',
           symbol: '🐙',
         };
       case 'cloudflare':
         return {
           badgeClass: 'bg-amber-950/70 text-amber-300 border border-amber-700/60',
-          dotClass: 'bg-amber-400',
           symbol: '⚡',
         };
       case 'render':
         return {
           badgeClass: 'bg-purple-950/70 text-purple-300 border border-purple-700/60',
-          dotClass: 'bg-purple-400',
           symbol: '🚀',
         };
       default:
         return {
           badgeClass: 'bg-blue-950/70 text-blue-300 border border-blue-700/60',
-          dotClass: 'bg-blue-400',
           symbol: '🌐',
         };
     }
@@ -247,7 +227,7 @@ export function LiveDeploymentsDrawer({
   return (
     <div
       id="live-deployments-overlay"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 ${
         isFullscreen ? 'p-0' : ''
       }`}
     >
@@ -257,44 +237,50 @@ export function LiveDeploymentsDrawer({
           isFullscreen ? 'w-full h-full rounded-none border-none' : 'w-[96vw] max-w-7xl h-[92vh]'
         }`}
       >
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 bg-slate-900/90 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+        {/* Top Header Bar with Mobile / Tablet / Desktop & Action Controls */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800/80 bg-slate-900/95 shrink-0 z-10">
+          {/* Left: Branding & Active Item Name */}
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 shrink-0">
               <Globe className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-slate-100 tracking-tight">Live Sites & Deployments</h2>
+                <h2 className="text-sm font-bold text-slate-100 tracking-tight">Live Output Sandbox</h2>
+                {selectedItem && (
+                  <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-xs text-slate-300 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span className="truncate max-w-[200px]">{selectedItem.repoName}</span>
+                  </span>
+                )}
                 <span className="px-2 py-0.5 rounded-full bg-sky-950/80 border border-sky-800/60 text-sky-300 text-[10px] font-semibold">
-                  {deploymentsList.length} Active {deploymentsList.length === 1 ? 'URL' : 'URLs'}
+                  {deploymentsList.length} {deploymentsList.length === 1 ? 'URL' : 'URLs'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
-                {selectedRepo ? `Production & staging URLs discovered for ${selectedRepo.name}` : 'Live web application sandbox'}
-              </p>
             </div>
           </div>
 
+          {/* Right: Device Viewport Switcher, Open in New Tab, Refresh, Fullscreen, Close */}
           <div className="flex items-center gap-2">
-            {/* Viewport Mode Switcher */}
-            <div className="hidden sm:flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            {/* Viewport Mode Switcher (Mobile / Tablet / Desktop) */}
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 shadow-inner">
               <button
                 type="button"
                 onClick={() => setViewportMode('desktop')}
-                className={`p-1.5 rounded text-xs transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
                   viewportMode === 'desktop'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
-                title="Desktop View (100%)"
+                title="Desktop View (Full Screen Output)"
               >
                 <Monitor className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Desktop</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewportMode('tablet')}
-                className={`p-1.5 rounded text-xs transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
                   viewportMode === 'tablet'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-slate-200'
@@ -302,11 +288,12 @@ export function LiveDeploymentsDrawer({
                 title="Tablet View (768px)"
               >
                 <Tablet className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tablet</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewportMode('mobile')}
-                className={`p-1.5 rounded text-xs transition-colors cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
                   viewportMode === 'mobile'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-slate-200'
@@ -314,8 +301,35 @@ export function LiveDeploymentsDrawer({
                 title="Mobile View (375px)"
               >
                 <Smartphone className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Mobile</span>
               </button>
             </div>
+
+            {selectedItem && (
+              <>
+                {/* Reload Preview */}
+                <button
+                  type="button"
+                  onClick={() => setIframeKey((prev) => prev + 1)}
+                  className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title="Reload Live Preview"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Open in New Tab Button */}
+                <a
+                  href={selectedItem.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+                  title="Open live site in new browser tab"
+                >
+                  <span className="hidden sm:inline">Open in Tab</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </>
+            )}
 
             {/* Toggle Fullscreen */}
             <button
@@ -331,7 +345,7 @@ export function LiveDeploymentsDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer ml-1"
               title="Close Live Sites Panel"
             >
               <X className="w-4 h-4" />
@@ -339,11 +353,11 @@ export function LiveDeploymentsDrawer({
           </div>
         </div>
 
-        {/* Main Body: Left Rail of Site Icons & Right Embedded Browser */}
+        {/* Main Body: Left Vertical Links Rail & Pure Full Output on Right */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Left Vertical Rail: Sites List with Icons */}
-          <div className="w-64 sm:w-72 shrink-0 border-r border-slate-800/80 bg-slate-950 flex flex-col overflow-hidden">
-            <div className="p-2.5 border-b border-slate-800/70 flex items-center justify-between">
+          {/* Left Vertical Rail: All Live Links */}
+          <div className="w-60 sm:w-64 md:w-72 shrink-0 border-r border-slate-800/80 bg-slate-950 flex flex-col overflow-hidden">
+            <div className="p-2.5 border-b border-slate-800/70 flex items-center justify-between shrink-0">
               <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
                 Production Links
               </span>
@@ -351,7 +365,7 @@ export function LiveDeploymentsDrawer({
                 type="button"
                 onClick={() => setIsAddingCustom(!isAddingCustom)}
                 className="px-2 py-1 rounded-md bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                title="Add Custom URL"
+                title="Add Custom Live URL"
               >
                 <Plus className="w-3 h-3" />
                 <span>Add URL</span>
@@ -360,10 +374,10 @@ export function LiveDeploymentsDrawer({
 
             {/* Add Custom URL Form */}
             {isAddingCustom && (
-              <form onSubmit={handleAddCustom} className="p-2.5 border-b border-slate-800/80 bg-slate-900/60 space-y-2">
+              <form onSubmit={handleAddCustom} className="p-2.5 border-b border-slate-800/80 bg-slate-900/60 space-y-2 shrink-0">
                 <input
                   type="text"
-                  placeholder="Website Name (e.g. My Vercel App)"
+                  placeholder="Website Name (e.g. My App)"
                   value={customTitleInput}
                   onChange={(e) => setCustomTitleInput(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 text-xs placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
@@ -412,12 +426,11 @@ export function LiveDeploymentsDrawer({
                     key={item.id}
                     onClick={() => {
                       setSelectedItem(item);
-                      setIsIframeLoaded(false);
                       setIframeKey((prev) => prev + 1);
                     }}
                     className={`group p-2.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-2 ${
                       isSelected
-                        ? 'bg-slate-900 border-indigo-500/60 shadow-md shadow-indigo-950/30'
+                        ? 'bg-slate-900 border-indigo-500/70 shadow-md shadow-indigo-950/40 ring-1 ring-indigo-500/40'
                         : 'bg-slate-950 border-slate-800/60 hover:bg-slate-900/50 hover:border-slate-700'
                     }`}
                   >
@@ -476,100 +489,38 @@ export function LiveDeploymentsDrawer({
             </div>
           </div>
 
-          {/* Right Area: Interactive Live Embedded Browser Sandbox */}
-          <div className="flex-1 flex flex-col min-w-0 bg-slate-900/40 overflow-hidden">
+          {/* Right Area: Pure Full Live Output without URL bars or Clutter */}
+          <div className="flex-1 flex flex-col min-w-0 bg-slate-950 overflow-hidden relative">
             {selectedItem ? (
-              <>
-                {/* Browser Address Bar */}
-                <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800/80 bg-slate-950/80 gap-2 shrink-0">
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsIframeLoaded(false);
-                        setIframeKey((prev) => prev + 1);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                      title="Reload Preview"
+              <div className="w-full h-full flex items-center justify-center overflow-hidden bg-slate-950">
+                {viewportMode === 'desktop' ? (
+                  /* 100% Edge-to-Edge Pure Output */
+                  <iframe
+                    key={iframeKey}
+                    src={selectedItem.url}
+                    className="w-full h-full bg-white border-0"
+                    title={`Live output of ${selectedItem.repoName}`}
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
+                  />
+                ) : (
+                  /* Mobile or Tablet Centered Output Frame */
+                  <div className="w-full h-full flex items-center justify-center p-4 bg-slate-900/40">
+                    <div
+                      className={`h-full max-h-[96vh] bg-white rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-800 transition-all duration-300 flex flex-col ${
+                        viewportMode === 'mobile' ? 'w-[375px]' : 'w-[768px]'
+                      }`}
                     >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* URL Display */}
-                  <div className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 font-mono min-w-0">
-                    <div className="flex items-center gap-2 truncate">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-                      <span className="truncate select-all">{selectedItem.url}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1 ml-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(selectedItem.url)}
-                        className="p-1 text-slate-400 hover:text-slate-200 rounded cursor-pointer"
-                        title="Copy URL"
-                      >
-                        {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+                      <iframe
+                        key={iframeKey}
+                        src={selectedItem.url}
+                        className="w-full flex-1 bg-white border-0"
+                        title={`Live output of ${selectedItem.repoName}`}
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
+                      />
                     </div>
                   </div>
-
-                  {/* Open in New Tab Button */}
-                  <a
-                    href={selectedItem.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors shadow-xs shrink-0 cursor-pointer"
-                    title="Open Live Site in New Tab"
-                  >
-                    <span>Open in New Tab</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-
-                {/* Viewport Frame Container */}
-                <div className="flex-1 flex items-center justify-center p-2 sm:p-4 overflow-hidden bg-slate-950/60 relative">
-                  <div
-                    className={`h-full bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 shadow-2xl transition-all duration-300 flex flex-col relative ${
-                      viewportMode === 'mobile'
-                        ? 'w-[375px]'
-                        : viewportMode === 'tablet'
-                        ? 'w-[768px]'
-                        : 'w-full'
-                    }`}
-                  >
-                    {/* Embedded iFrame */}
-                    <iframe
-                      key={iframeKey}
-                      src={selectedItem.url}
-                      onLoad={() => setIsIframeLoaded(true)}
-                      className="w-full flex-1 bg-white border-0"
-                      title={`Preview of ${selectedItem.repoName}`}
-                      sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
-                    />
-
-                    {/* Frame header notice bar */}
-                    <div className="px-3 py-1.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        <span>
-                          {selectedItem.provider} • {selectedItem.environment}
-                        </span>
-                      </div>
-                      <a
-                        href={selectedItem.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-400 hover:text-indigo-300 hover:underline flex items-center gap-1 font-medium"
-                      >
-                        <span>Direct Link</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </>
+                )}
+              </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 space-y-3">
                 <Globe className="w-10 h-10 text-sky-400/50" />
