@@ -196,23 +196,58 @@ export function LiveDeploymentsDrawer({
         };
       case 'netlify':
         return {
-          badgeClass: 'bg-teal-950/70 text-teal-300 border border-teal-700/60',
+          badgeClass: 'bg-teal-950/80 text-teal-300 border border-teal-700/60',
           symbol: '◆',
         };
       case 'github pages':
         return {
-          badgeClass: 'bg-indigo-950/70 text-indigo-300 border border-indigo-700/60',
+          badgeClass: 'bg-indigo-950/80 text-indigo-300 border border-indigo-700/60',
           symbol: '🐙',
         };
       case 'cloudflare':
         return {
-          badgeClass: 'bg-amber-950/70 text-amber-300 border border-amber-700/60',
+          badgeClass: 'bg-amber-950/80 text-amber-300 border border-amber-700/60',
           symbol: '⚡',
         };
       case 'render':
         return {
-          badgeClass: 'bg-purple-950/70 text-purple-300 border border-purple-700/60',
+          badgeClass: 'bg-purple-950/80 text-purple-300 border border-purple-700/60',
           symbol: '🚀',
+        };
+      case 'railway':
+        return {
+          badgeClass: 'bg-rose-950/80 text-rose-300 border border-rose-700/60',
+          symbol: '🚂',
+        };
+      case 'heroku':
+        return {
+          badgeClass: 'bg-violet-950/80 text-violet-300 border border-violet-700/60',
+          symbol: '🟣',
+        };
+      case 'fly.io':
+        return {
+          badgeClass: 'bg-fuchsia-950/80 text-fuchsia-300 border border-fuchsia-700/60',
+          symbol: '🎈',
+        };
+      case 'firebase':
+        return {
+          badgeClass: 'bg-orange-950/80 text-orange-300 border border-orange-700/60',
+          symbol: '🔥',
+        };
+      case 'surge':
+        return {
+          badgeClass: 'bg-cyan-950/80 text-cyan-300 border border-cyan-700/60',
+          symbol: '🌊',
+        };
+      case 'aws amplify':
+        return {
+          badgeClass: 'bg-sky-950/80 text-sky-300 border border-sky-700/60',
+          symbol: '☁️',
+        };
+      case 'supabase':
+        return {
+          badgeClass: 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60',
+          symbol: '⚡',
         };
       default:
         return {

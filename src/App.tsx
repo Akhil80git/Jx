@@ -159,6 +159,20 @@ export default function App() {
       .catch((err) => console.warn('Could not check server health:', err));
   }, []);
 
+  // Synchronize document theme class for Light / Dark mode
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    } else {
+      root.classList.add('dark');
+      root.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
+    }
+  }, [theme]);
+
   // Fetch initial repos on mount
   useEffect(() => {
     if (username) {
@@ -204,17 +218,19 @@ export default function App() {
     showToast('GitHub Token updated');
   };
 
-  // Fetch user repositories
-  const handleFetchRepos = async (userToFetch: string) => {
-    const cleanUser = userToFetch.trim();
-    if (!cleanUser && !githubToken) return;
+  // Fetch user repositories (supports loading all repositories)
+  const handleFetchRepos = async (userToFetch?: string, limit: number | 'all' = 'all') => {
+    const targetUser = (userToFetch || username).trim();
+    if (!targetUser && !githubToken) return;
 
     setIsLoadingRepos(true);
     setRepoError(null);
 
     try {
-      localStorage.setItem(STORAGE_KEY_GITHUB_USER, cleanUser);
-      const reposList = await fetchUserRepos(cleanUser, githubToken);
+      if (targetUser) {
+        localStorage.setItem(STORAGE_KEY_GITHUB_USER, targetUser);
+      }
+      const reposList = await fetchUserRepos(targetUser, githubToken, { limit });
       setRepos(reposList);
       if (reposList && reposList.length > 0 && !selectedRepo) {
         // Auto select first repo
@@ -685,8 +701,9 @@ export default function App() {
 
   return (
     <div
-      className={`flex flex-col h-screen antialiased overflow-hidden font-sans selection:bg-blue-600 selection:text-white ${
-        theme === 'dark' ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-900 text-slate-100'
+      id="app-root-view"
+      className={`app-root-container flex flex-col h-screen antialiased overflow-hidden font-sans selection:bg-blue-600 selection:text-white ${
+        theme === 'dark' ? 'dark bg-slate-950 text-slate-100' : 'light bg-slate-50 text-slate-900'
       }`}
     >
       {/* Top Header */}

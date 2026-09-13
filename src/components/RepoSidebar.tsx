@@ -1,5 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Search, FolderGit2, Star, GitFork, RefreshCw, Lock, ExternalLink, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Search,
+  FolderGit2,
+  Star,
+  RefreshCw,
+  Lock,
+  ChevronLeft,
+  User,
+  Layers,
+  Sparkles,
+} from 'lucide-react';
 import { GitHubRepo } from '../types';
 
 interface RepoSidebarProps {
@@ -8,7 +18,7 @@ interface RepoSidebarProps {
   onSelectRepo: (repo: GitHubRepo) => void;
   username: string;
   onChangeUsername: (username: string) => void;
-  onFetchRepos: (user: string) => void;
+  onFetchRepos: (user: string, limit?: number | 'all') => void;
   isLoading: boolean;
   isOpen: boolean;
   onToggle: () => void;
@@ -31,6 +41,7 @@ export function RepoSidebar({
 }: RepoSidebarProps) {
   const [searchInput, setSearchInput] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
+  const [fetchLimit, setFetchLimit] = useState<'100' | '250' | 'all'>('all');
 
   useEffect(() => {
     setSearchInput(username);
@@ -40,12 +51,22 @@ export function RepoSidebar({
     e.preventDefault();
     if (!searchInput.trim()) return;
     onChangeUsername(searchInput.trim());
-    onFetchRepos(searchInput.trim());
+    const limitArg = fetchLimit === 'all' ? 'all' : parseInt(fetchLimit, 10);
+    onFetchRepos(searchInput.trim(), limitArg);
   };
 
-  const filteredRepos = repos.filter((r) =>
-    r.name.toLowerCase().includes(filterQuery.toLowerCase()) ||
-    (r.description && r.description.toLowerCase().includes(filterQuery.toLowerCase()))
+  const handleLoadAll = () => {
+    setFetchLimit('all');
+    if (searchInput.trim() || username) {
+      onFetchRepos(searchInput.trim() || username, 'all');
+    }
+  };
+
+  const filteredRepos = repos.filter(
+    (r) =>
+      r.name.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      (r.description && r.description.toLowerCase().includes(filterQuery.toLowerCase())) ||
+      (r.language && r.language.toLowerCase().includes(filterQuery.toLowerCase()))
   );
 
   return (
@@ -67,14 +88,19 @@ export function RepoSidebar({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={onToggle}
-            className="p-1 text-slate-400 hover:text-slate-200 rounded hover:bg-slate-800 cursor-pointer shrink-0"
-            title="Collapse Sidebar"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-900 border border-slate-800 text-slate-300">
+              {repos.length}
+            </span>
+            <button
+              type="button"
+              onClick={onToggle}
+              className="p-1 text-slate-400 hover:text-slate-200 rounded hover:bg-slate-800 cursor-pointer shrink-0"
+              title="Collapse Sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Username Search Form */}
@@ -99,7 +125,53 @@ export function RepoSidebar({
             </button>
           </div>
 
-          {/* Quick presets */}
+          {/* Load Limit Mode Switcher (100, 250, All) */}
+          <div className="flex items-center justify-between pt-0.5">
+            <div className="flex items-center gap-1">
+              <Layers className="w-3 h-3 text-slate-500" />
+              <span className="text-[10px] text-slate-400 font-medium">Fetch:</span>
+            </div>
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-md p-0.5">
+              <button
+                type="button"
+                onClick={() => setFetchLimit('100')}
+                className={`px-1.5 py-0.2 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                  fetchLimit === '100'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Fetch up to 100 repositories"
+              >
+                100
+              </button>
+              <button
+                type="button"
+                onClick={() => setFetchLimit('250')}
+                className={`px-1.5 py-0.2 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                  fetchLimit === '250'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Fetch up to 250 repositories"
+              >
+                250
+              </button>
+              <button
+                type="button"
+                onClick={() => setFetchLimit('all')}
+                className={`px-1.5 py-0.2 rounded text-[9px] font-semibold transition-colors cursor-pointer ${
+                  fetchLimit === 'all'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Fetch ALL repositories (thousands)"
+              >
+                All (Hajaro)
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
           <div className="flex items-center gap-1 overflow-x-auto py-0.5 no-scrollbar">
             <span className="text-[10px] text-slate-500 shrink-0">Try:</span>
             {PRESET_USERS.map((preset) => (
@@ -109,7 +181,8 @@ export function RepoSidebar({
                 onClick={() => {
                   setSearchInput(preset);
                   onChangeUsername(preset);
-                  onFetchRepos(preset);
+                  const limitArg = fetchLimit === 'all' ? 'all' : parseInt(fetchLimit, 10);
+                  onFetchRepos(preset, limitArg);
                 }}
                 className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer shrink-0 ${
                   username.toLowerCase() === preset.toLowerCase()
@@ -133,7 +206,7 @@ export function RepoSidebar({
               type="text"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Filter repos..."
+              placeholder="Filter by name or language..."
               className="w-full pl-6 pr-2.5 py-1 rounded-md bg-slate-900/80 border border-slate-800 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-slate-700"
             />
           </div>
@@ -152,7 +225,7 @@ export function RepoSidebar({
         {isLoading ? (
           <div className="py-10 text-center text-xs text-slate-400 space-y-2">
             <RefreshCw className="w-4 h-4 animate-spin mx-auto text-blue-400" />
-            <p>Fetching repositories...</p>
+            <p>Fetching repositories (including all pages)...</p>
           </div>
         ) : repos.length === 0 ? (
           <div className="py-8 text-center px-3">
@@ -167,56 +240,74 @@ export function RepoSidebar({
             No repos matching "{filterQuery}"
           </div>
         ) : (
-          filteredRepos.map((repo) => {
-            const isSelected = selectedRepo?.id === repo.id;
-            return (
-              <button
-                key={repo.id}
-                id={`repo-item-${repo.id}`}
-                type="button"
-                onClick={() => onSelectRepo(repo)}
-                className={`w-full text-left p-2 rounded-lg transition-all border cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-950/60 border-blue-600/70 text-white shadow-xs'
-                    : 'bg-slate-900/40 border-transparent hover:bg-slate-900/80 hover:border-slate-800 text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-1">
-                  <div className="font-semibold text-xs text-slate-200 truncate flex items-center gap-1">
-                    {repo.private && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
-                    <span className="truncate">{repo.name}</span>
+          <>
+            {filteredRepos.map((repo) => {
+              const isSelected = selectedRepo?.id === repo.id;
+              return (
+                <button
+                  key={repo.id}
+                  id={`repo-item-${repo.id}`}
+                  type="button"
+                  onClick={() => onSelectRepo(repo)}
+                  className={`w-full text-left p-2 rounded-lg transition-all border cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-950/60 border-blue-600/70 text-white shadow-xs'
+                      : 'bg-slate-900/40 border-transparent hover:bg-slate-900/80 hover:border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="font-semibold text-xs text-slate-200 truncate flex items-center gap-1">
+                      {repo.private && <Lock className="w-3 h-3 text-amber-400 shrink-0" />}
+                      <span className="truncate">{repo.name}</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 text-[10px] text-slate-400 font-mono shrink-0">
+                      <Star className="w-3 h-3 text-amber-400 fill-amber-400/20" />
+                      <span>{repo.stargazers_count}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-0.5 text-[10px] text-slate-400 font-mono shrink-0">
-                    <Star className="w-3 h-3 text-amber-400 fill-amber-400/20" />
-                    <span>{repo.stargazers_count}</span>
-                  </div>
-                </div>
 
-                {repo.description && (
-                  <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 leading-snug">
-                    {repo.description}
-                  </p>
-                )}
-
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
-                  {repo.language && (
-                    <span className="flex items-center gap-1 text-slate-400 font-mono truncate">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
-                      <span className="truncate">{repo.language}</span>
-                    </span>
+                  {repo.description && (
+                    <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5 leading-snug">
+                      {repo.description}
+                    </p>
                   )}
-                  <span className="text-slate-600">•</span>
-                  <span className="truncate">{repo.default_branch}</span>
-                </div>
-              </button>
-            );
-          })
+
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                    {repo.language && (
+                      <span className="flex items-center gap-1 text-slate-400 font-mono truncate">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
+                        <span className="truncate">{repo.language}</span>
+                      </span>
+                    )}
+                    <span className="text-slate-600">•</span>
+                    <span className="truncate">{repo.default_branch}</span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* If 100 loaded and limit wasn't all, offer Load All */}
+            {repos.length === 100 && fetchLimit !== 'all' && (
+              <div className="p-2 pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={handleLoadAll}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
+                  <span>Load All Repositories ({'>'}100)</span>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Footer Info */}
       <div className="p-2.5 border-t border-slate-800/80 text-[10px] text-slate-500 flex items-center justify-between bg-slate-950">
-        <span>{filteredRepos.length} Repos</span>
+        <span>
+          {filteredRepos.length} / {repos.length} Repos
+        </span>
         {username && <span className="font-mono text-slate-400">@{username}</span>}
       </div>
     </div>

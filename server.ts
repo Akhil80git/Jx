@@ -106,33 +106,58 @@ async function startServer() {
     return headers;
   }
 
-  // GitHub Repos list endpoint
+  // GitHub Repos list endpoint (Supports pagination & "all" repos load)
   app.get("/api/github/repos", async (req, res) => {
     try {
       const username = (req.query.username as string)?.trim();
       const token = ((req.headers["x-github-token"] as string) || (req.query.token as string))?.trim();
+      const limitParam = (req.query.limit as string)?.trim().toLowerCase() || "100";
+      const loadAll = limitParam === "all" || req.query.all === "true";
 
       if (!username && !token) {
         return res.status(400).json({ error: "Username ya GitHub Token required hai." });
       }
 
-      let url = "";
-      if (username) {
-        url = `https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=100&sort=updated`;
-      } else {
-        url = `https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator`;
+      let allRepos: any[] = [];
+      let page = 1;
+      const maxPages = loadAll ? 30 : Math.min(Math.ceil(parseInt(limitParam, 10) / 100) || 1, 30);
+
+      while (page <= maxPages) {
+        let url = "";
+        if (username) {
+          url = `https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=100&page=${page}&sort=updated`;
+        } else {
+          url = `https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator`;
+        }
+
+        const ghRes = await fetch(url, { headers: getGitHubHeaders(token) });
+        if (!ghRes.ok) {
+          // If first page failed, return error
+          if (page === 1) {
+            const errJson = await ghRes.json().catch(() => ({}));
+            return res.status(ghRes.status).json({
+              error: errJson.message || `GitHub API error: ${ghRes.statusText}`,
+            });
+          }
+          break; // end of pages or rate limit
+        }
+
+        const pageRepos = await ghRes.json();
+        if (!Array.isArray(pageRepos) || pageRepos.length === 0) {
+          break;
+        }
+
+        allRepos.push(...pageRepos);
+
+        // If returned items is less than 100, no more pages exist
+        if (pageRepos.length < 100) {
+          break;
+        }
+
+        page++;
       }
 
-      const ghRes = await fetch(url, { headers: getGitHubHeaders(token) });
-      if (!ghRes.ok) {
-        const errJson = await ghRes.json().catch(() => ({}));
-        return res.status(ghRes.status).json({
-          error: errJson.message || `GitHub API error: ${ghRes.statusText}`,
-        });
-      }
-
-      const repos = await ghRes.json();
-      res.json({ repos: Array.isArray(repos) ? repos : [] });
+      res.json({ repos: allRepos, total: allRepos.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to fetch repositories." });
     }
@@ -383,7 +408,27 @@ async function startServer() {
     }
   });
 
-  // GitHub Deployments and Live Production URL discovery endpoint
+  // Helper to detect deployment provider from URL and environment name
+  function detectProviderFromUrl(url: string, envName = ""): string {
+    const lowerUrl = url.toLowerCase();
+    const lowerEnv = envName.toLowerCase();
+
+    if (lowerUrl.includes("onrender.com") || lowerEnv.includes("render")) return "Render";
+    if (lowerUrl.includes("netlify.app") || lowerEnv.includes("netlify")) return "Netlify";
+    if (lowerUrl.includes("vercel.app") || lowerEnv.includes("vercel")) return "Vercel";
+    if (lowerUrl.includes("github.io") || lowerEnv.includes("github-pages") || lowerEnv.includes("github pages")) return "GitHub Pages";
+    if (lowerUrl.includes("pages.dev") || lowerUrl.includes("workers.dev") || lowerEnv.includes("cloudflare")) return "Cloudflare";
+    if (lowerUrl.includes("railway.app") || lowerEnv.includes("railway")) return "Railway";
+    if (lowerUrl.includes("herokuapp.com") || lowerEnv.includes("heroku")) return "Heroku";
+    if (lowerUrl.includes("fly.dev") || lowerEnv.includes("fly")) return "Fly.io";
+    if (lowerUrl.includes("web.app") || lowerUrl.includes("firebaseapp.com") || lowerEnv.includes("firebase")) return "Firebase";
+    if (lowerUrl.includes("surge.sh") || lowerEnv.includes("surge")) return "Surge";
+    if (lowerUrl.includes("amplifyapp.com") || lowerEnv.includes("amplify")) return "AWS Amplify";
+    if (lowerUrl.includes("supabase.co") || lowerEnv.includes("supabase")) return "Supabase";
+    return "Web Application";
+  }
+
+  // GitHub Deployments and Live Production URL discovery endpoint (Multi-Platform: Render, Netlify, Vercel, GitHub Pages, Cloudflare, Railway, etc.)
   app.get("/api/github/deployments", async (req, res) => {
     try {
       const owner = (req.query.owner as string)?.trim();
@@ -392,14 +437,6 @@ async function startServer() {
 
       if (!owner || !repo) {
         return res.status(400).json({ error: "Owner and repo are required." });
-      }
-
-      const deploymentsUrl = `https://api.github.com/repos/${owner}/${repo}/deployments?per_page=20`;
-      const ghRes = await fetch(deploymentsUrl, { headers: getGitHubHeaders(token) });
-
-      let deployments: any[] = [];
-      if (ghRes.ok) {
-        deployments = await ghRes.json();
       }
 
       const liveUrls: Array<{
@@ -413,49 +450,202 @@ async function startServer() {
         provider: string;
       }> = [];
 
-      if (Array.isArray(deployments)) {
-        for (const dep of deployments.slice(0, 10)) {
-          try {
-            const statusUrl = dep.statuses_url || `https://api.github.com/repos/${owner}/${repo}/deployments/${dep.id}/statuses`;
-            const statusRes = await fetch(statusUrl, { headers: getGitHubHeaders(token) });
-            if (statusRes.ok) {
-              const statuses = await statusRes.json();
-              if (Array.isArray(statuses) && statuses.length > 0) {
-                const latestSuccess = statuses.find(
-                  (s: any) => s.state === 'success' && (s.environment_url || s.target_url)
-                ) || statuses[0];
+      const seenUrls = new Set<string>();
 
-                const targetUrl = latestSuccess?.environment_url || latestSuccess?.target_url;
-                if (targetUrl && (targetUrl.startsWith('http://') || targetUrl.startsWith('https://'))) {
-                  let provider = 'Production';
-                  if (targetUrl.includes('vercel.app')) provider = 'Vercel';
-                  else if (targetUrl.includes('netlify.app')) provider = 'Netlify';
-                  else if (targetUrl.includes('github.io')) provider = 'GitHub Pages';
-                  else if (targetUrl.includes('pages.dev')) provider = 'Cloudflare';
-                  else if (targetUrl.includes('onrender.com')) provider = 'Render';
-                  else if (targetUrl.includes('railway.app')) provider = 'Railway';
-                  else if (targetUrl.includes('herokuapp.com')) provider = 'Heroku';
+      const addLiveUrl = (item: {
+        id: string;
+        environment: string;
+        url: string;
+        creator?: string;
+        createdAt?: string;
+        provider?: string;
+      }) => {
+        let cleanUrl = item.url.trim();
+        // Remove trailing punctuation or brackets from markdown extraction
+        cleanUrl = cleanUrl.replace(/[.,;)>\]]+$/, "");
+        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) return;
+        const normalized = cleanUrl.toLowerCase().replace(/\/+$/, "");
+        if (seenUrls.has(normalized)) return;
+        seenUrls.add(normalized);
 
-                  liveUrls.push({
-                    id: String(dep.id),
-                    repoFullName: `${owner}/${repo}`,
-                    repoName: repo,
-                    environment: dep.environment || 'Production',
-                    url: targetUrl,
-                    creator: dep.creator?.login || 'CI/CD Bot',
-                    createdAt: dep.created_at,
-                    provider,
-                  });
+        liveUrls.push({
+          id: item.id,
+          repoFullName: `${owner}/${repo}`,
+          repoName: repo,
+          environment: item.environment || "Production",
+          url: cleanUrl,
+          creator: item.creator || "CI/CD Deployment",
+          createdAt: item.createdAt || new Date().toISOString(),
+          provider: item.provider || detectProviderFromUrl(cleanUrl, item.environment),
+        });
+      };
+
+      // 1. Check official GitHub Deployments API
+      try {
+        const deploymentsUrl = `https://api.github.com/repos/${owner}/${repo}/deployments?per_page=20`;
+        const ghRes = await fetch(deploymentsUrl, { headers: getGitHubHeaders(token) });
+        if (ghRes.ok) {
+          const deployments = await ghRes.json();
+          if (Array.isArray(deployments)) {
+            for (const dep of deployments.slice(0, 10)) {
+              try {
+                const statusUrl = dep.statuses_url || `https://api.github.com/repos/${owner}/${repo}/deployments/${dep.id}/statuses`;
+                const statusRes = await fetch(statusUrl, { headers: getGitHubHeaders(token) });
+                if (statusRes.ok) {
+                  const statuses = await statusRes.json();
+                  if (Array.isArray(statuses) && statuses.length > 0) {
+                    const latestSuccess = statuses.find(
+                      (s: any) => s.state === 'success' && (s.environment_url || s.target_url)
+                    ) || statuses[0];
+
+                    const targetUrl = latestSuccess?.environment_url || latestSuccess?.target_url;
+                    if (targetUrl) {
+                      addLiveUrl({
+                        id: `gh-dep-${dep.id}`,
+                        environment: dep.environment || 'Production',
+                        url: targetUrl,
+                        creator: dep.creator?.login || 'CI/CD Bot',
+                        createdAt: dep.created_at,
+                      });
+                    }
+                  }
                 }
+              } catch {
+                // ignore
               }
             }
-          } catch {
-            // ignore individual deployment status error
           }
         }
+      } catch {
+        // ignore
       }
 
-      res.json({ deployments: liveUrls });
+      // 2. Check GitHub Pages API
+      try {
+        const pagesRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/pages`, {
+          headers: getGitHubHeaders(token),
+        });
+        if (pagesRes.ok) {
+          const pagesData = await pagesRes.json();
+          if (pagesData && pagesData.html_url) {
+            addLiveUrl({
+              id: `gh-pages-${owner}-${repo}`,
+              environment: 'GitHub Pages',
+              url: pagesData.html_url,
+              provider: 'GitHub Pages',
+              createdAt: pagesData.updated_at,
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      // 3. Check Repository Metadata Homepage
+      try {
+        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+          headers: getGitHubHeaders(token),
+        });
+        if (repoRes.ok) {
+          const repoData = await repoRes.json();
+          if (repoData && repoData.homepage && (repoData.homepage.startsWith('http://') || repoData.homepage.startsWith('https://'))) {
+            addLiveUrl({
+              id: `repo-homepage-${owner}-${repo}`,
+              environment: 'Homepage / Live Site',
+              url: repoData.homepage,
+              createdAt: repoData.updated_at,
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      // 4. Check README.md for live demo links across Render, Netlify, Vercel, etc.
+      try {
+        const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+          headers: getGitHubHeaders(token),
+        });
+        if (readmeRes.ok) {
+          const readmeData = await readmeRes.json();
+          if (readmeData && readmeData.content) {
+            const readmeText = Buffer.from(readmeData.content, 'base64').toString('utf-8');
+
+            // Regex patterns for various cloud deployment URLs
+            const platformRegexes = [
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.onrender\.com[^\s\)"'<>"]*/gi, provider: 'Render' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.netlify\.app[^\s\)"'<>"]*/gi, provider: 'Netlify' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.vercel\.app[^\s\)"'<>"]*/gi, provider: 'Vercel' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.pages\.dev[^\s\)"'<>"]*/gi, provider: 'Cloudflare' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.(?:up\.)?railway\.app[^\s\)"'<>"]*/gi, provider: 'Railway' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.herokuapp\.com[^\s\)"'<>"]*/gi, provider: 'Heroku' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.fly\.dev[^\s\)"'<>"]*/gi, provider: 'Fly.io' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.(?:web\.app|firebaseapp\.com)[^\s\)"'<>"]*/gi, provider: 'Firebase' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.surge\.sh[^\s\)"'<>"]*/gi, provider: 'Surge' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.amplifyapp\.com[^\s\)"'<>"]*/gi, provider: 'AWS Amplify' },
+              { regex: /https:\/\/[a-zA-Z0-9_.-]+\.github\.io\/[^\s\)"'<>"]*/gi, provider: 'GitHub Pages' },
+            ];
+
+            platformRegexes.forEach(({ regex, provider }) => {
+              const matches = readmeText.match(regex);
+              if (matches) {
+                matches.slice(0, 3).forEach((matchedUrl, idx) => {
+                  addLiveUrl({
+                    id: `readme-${provider.toLowerCase().replace(/\s+/g, '-')}-${idx}`,
+                    environment: `${provider} Live Site`,
+                    url: matchedUrl,
+                    provider,
+                  });
+                });
+              }
+            });
+
+            // Markdown link regex for [Demo](https://...) or [Live](https://...)
+            const demoLinkRegex = /\[(?:Live Demo|Demo|Live Site|Website|App|Live Preview|Deployed Application|Preview)\]\((https?:\/\/[^\s\)]+)\)/gi;
+            let demoMatch;
+            let demoIdx = 0;
+            while ((demoMatch = demoLinkRegex.exec(readmeText)) !== null && demoIdx < 4) {
+              const url = demoMatch[1];
+              if (url && !url.includes('github.com') && !url.includes('badge')) {
+                addLiveUrl({
+                  id: `readme-demo-link-${demoIdx}`,
+                  environment: 'README Demo Link',
+                  url,
+                  provider: detectProviderFromUrl(url, 'Demo Link'),
+                });
+                demoIdx++;
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      // 5. Check package.json for "homepage"
+      try {
+        const pkgRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/package.json`, {
+          headers: getGitHubHeaders(token),
+        });
+        if (pkgRes.ok) {
+          const pkgData = await pkgRes.json();
+          if (pkgData && pkgData.content) {
+            const pkgJson = JSON.parse(Buffer.from(pkgData.content, 'base64').toString('utf-8'));
+            if (pkgJson.homepage && (pkgJson.homepage.startsWith('http://') || pkgJson.homepage.startsWith('https://'))) {
+              addLiveUrl({
+                id: `pkg-homepage-${owner}-${repo}`,
+                environment: 'package.json homepage',
+                url: pkgJson.homepage,
+                provider: detectProviderFromUrl(pkgJson.homepage, 'package.json'),
+              });
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      res.json({ deployments: liveUrls, total: liveUrls.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to fetch deployments." });
     }

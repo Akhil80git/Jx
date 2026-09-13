@@ -69,12 +69,17 @@ export async function checkBackendHealth(): Promise<{ status: string; hasEnvKey:
 
 /**
  * Fetch repositories:
- * 1. Tries local Express/Vercel serverless /api/github/repos first.
- * 2. If 404 or HTML response (static host), transparently queries official GitHub API directly.
+ * 1. Tries local Express/Vercel serverless /api/github/repos first (with limit=all support).
+ * 2. If 404 or HTML response (static host), transparently queries official GitHub API directly across multiple pages.
  */
-export async function fetchUserRepos(username: string, token?: string): Promise<GitHubRepo[]> {
+export async function fetchUserRepos(
+  username: string,
+  token?: string,
+  options?: { limit?: number | 'all' }
+): Promise<GitHubRepo[]> {
   const cleanUser = username.trim();
   const cleanToken = token?.trim() || '';
+  const limit = options?.limit ?? 'all';
 
   if (!cleanUser && !cleanToken) {
     throw new Error('Please provide a GitHub username or GitHub Personal Access Token.');
@@ -85,9 +90,11 @@ export async function fetchUserRepos(username: string, token?: string): Promise<
     const proxyHeaders: Record<string, string> = {};
     if (cleanToken) proxyHeaders['x-github-token'] = cleanToken;
 
-    const proxyRes = await fetch(`/api/github/repos?username=${encodeURIComponent(cleanUser)}`, {
-      headers: proxyHeaders,
-    });
+    const limitQuery = limit === 'all' ? 'limit=all&all=true' : `limit=${limit}`;
+    const proxyRes = await fetch(
+      `/api/github/repos?username=${encodeURIComponent(cleanUser)}&${limitQuery}`,
+      { headers: proxyHeaders }
+    );
 
     const contentType = proxyRes.headers.get('content-type') || '';
     if (proxyRes.ok && contentType.includes('application/json')) {
@@ -100,31 +107,51 @@ export async function fetchUserRepos(username: string, token?: string): Promise<
     // Fallback to direct client call
   }
 
-  // 2. Direct GitHub API fallback (works natively on Vercel, Netlify, or any static host)
-  let directUrl = '';
-  if (cleanUser) {
-    directUrl = `https://api.github.com/users/${encodeURIComponent(cleanUser)}/repos?per_page=100&sort=updated`;
-  } else {
-    directUrl = `https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator`;
-  }
+  // 2. Direct GitHub API fallback with pagination (works natively on Vercel, Netlify, or any static host)
+  const allRepos: GitHubRepo[] = [];
+  let page = 1;
+  const maxPages = limit === 'all' ? 30 : Math.min(Math.ceil(Number(limit) / 100) || 1, 30);
 
-  const directRes = await fetch(directUrl, {
-    headers: getGitHubHeaders(cleanToken),
-  });
-
-  if (!directRes.ok) {
-    let errMessage = `GitHub API error (${directRes.status}): ${directRes.statusText}`;
-    try {
-      const errJson = await directRes.json();
-      if (errJson && errJson.message) errMessage = errJson.message;
-    } catch {
-      // ignore
+  while (page <= maxPages) {
+    let directUrl = '';
+    if (cleanUser) {
+      directUrl = `https://api.github.com/users/${encodeURIComponent(cleanUser)}/repos?per_page=100&page=${page}&sort=updated`;
+    } else {
+      directUrl = `https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner,collaborator`;
     }
-    throw new Error(errMessage);
+
+    const directRes = await fetch(directUrl, {
+      headers: getGitHubHeaders(cleanToken),
+    });
+
+    if (!directRes.ok) {
+      if (page === 1) {
+        let errMessage = `GitHub API error (${directRes.status}): ${directRes.statusText}`;
+        try {
+          const errJson = await directRes.json();
+          if (errJson && errJson.message) errMessage = errJson.message;
+        } catch {
+          // ignore
+        }
+        throw new Error(errMessage);
+      }
+      break;
+    }
+
+    const repos = await directRes.json();
+    if (!Array.isArray(repos) || repos.length === 0) {
+      break;
+    }
+
+    allRepos.push(...repos);
+    if (repos.length < 100) {
+      break;
+    }
+
+    page++;
   }
 
-  const repos = await directRes.json();
-  return Array.isArray(repos) ? repos : [];
+  return allRepos;
 }
 
 /**

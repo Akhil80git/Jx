@@ -93,7 +93,7 @@ export function Header({
 
           <div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <h1 className="text-xs sm:text-sm font-bold text-white tracking-tight">Gemini Chat</h1>
+              <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight">Gemini Chat</h1>
               {/* Dynamic Model Badge */}
               <div
                 id="active-model-header-badge"
