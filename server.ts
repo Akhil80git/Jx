@@ -416,7 +416,7 @@ async function startServer() {
         .slice(0, 10)
         .join("\n\n");
 
-      const prompt = `You are a Senior Software Engineer and Git Code Reviewer.
+      const prompt = `You are an elite Senior Software Architect and Git Code Reviewer.
 Analyze this GitHub commit in repository "${repoFullName || 'Repository'}":
 
 Commit SHA: ${commitSha}
@@ -427,13 +427,35 @@ Stats: Total changed: ${stats?.total || 0} (+${stats?.additions || 0}, -${stats?
 Changed Files & Diffs:
 ${fileListSummary || "No patch data provided."}
 
-Generate a clear, thorough, and highly readable Markdown explanation of this commit covering:
-1. 📌 **Commit Purpose (Kyu kiya gaya change)**: Why this commit was made and what problem/feature it targets.
-2. 📂 **Files & Folders Modified**: Exact breakdown of which directories and files were touched and why.
-3. 🔍 **Code Changes & Diff Highlights**: Clear explanation of code additions (+), deletions (-), refactors, or fixes.
-4. 💡 **Architectural & Functional Impact**: How this modifies the system behavior or application workflow.
+Generate a clear, structured, and comprehensive Markdown documentation of this commit following this EXACT two-level hierarchy:
 
-Format as a pristine Markdown document with headers, bold text, bullet points, and code blocks.`;
+---
+
+## 🎯 1. Master Purpose & Overall Intent (Kyu Aur Kya Banane Ki Koshish Ki Gayi)
+- **High-Level Intent & Goal**: Explain clearly in accessible, precise language what feature, capability, refactor, or bug fix this commit was trying to build/solve (e.g. why was this change created, user/system benefit).
+- **Global Multi-File Scope (All Files Summary)**: Explain the big picture of what happened across ALL touched files combined, and how they connect with each other to accomplish this goal.
+- **Architectural & Runtime Impact**: What changes in state flow, user experience, API communication, or application logic.
+
+---
+
+## 📂 2. File-by-File Documentation & Breakdown (Neeche Har File Ke Changes Ka Detailed Doc)
+*(For EVERY changed file listed above, provide a dedicated sub-section documenting what was changed in that specific file)*:
+
+For each file, format as:
+### 📄 \`[filepath]\` (\`[status]\`, +[additions] / -[deletions])
+- **File Responsibility in Commit**: What this file does and why it was modified in this commit.
+- **Key Modifications**: Specific changes made (e.g. new methods, imported packages, modified interfaces, UI markup changes, bug fixes).
+- **Code Highlights & Explanation**: Short explanation of the code additions or removals in this file.
+
+---
+
+## 🔍 3. Code Diff Highlights & Logic Insights
+- Highlight key code snippets, edge cases handled, or algorithmic updates.
+
+## 🧪 4. Testing & Verification Checklist
+- Step-by-step instructions on how to test and verify these changes in the project.
+
+Format cleanly with headers, bold text, code blocks, and bullet points.`;
 
       let response: any;
       try {
@@ -442,7 +464,7 @@ Format as a pristine Markdown document with headers, bold text, bullet points, a
             model: targetModel,
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
-              systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in bilingual clear English/Hinglish.",
+              systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in clear English/Hinglish with structured top-level intent followed by file-by-file documentation.",
             },
           })
         );
@@ -453,7 +475,7 @@ Format as a pristine Markdown document with headers, bold text, bullet points, a
             model: "gemini-3.8-flash",
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
-              systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in bilingual clear English/Hinglish.",
+              systemInstruction: "You are an expert Git reviewer and technical architect. Provide deep, accurate, and easy-to-understand explanations of code diffs and commits in clear English/Hinglish with structured top-level intent followed by file-by-file documentation.",
             },
           })
         );
@@ -465,11 +487,234 @@ Format as a pristine Markdown document with headers, bold text, bullet points, a
         commitMessage,
         authorName,
         markdown,
-        modelUsed: model || "gemini-3.5-flash-lite",
+        modelUsed: model || "gemini-3.5-flash",
       });
     } catch (error: any) {
       console.error("Commit analysis error:", error);
       res.status(500).json({ error: extractCleanErrorMessage(error) });
+    }
+  });
+
+  // GitHub Clone & Push to User's Account endpoint
+  app.post("/api/github/clone-repo", async (req, res) => {
+    try {
+      const token = ((req.headers["x-github-token"] as string) || req.body.token)?.trim();
+      if (!token) {
+        return res.status(401).json({
+          error: "GitHub Personal Access Token (PAT) with 'repo' scope is required to clone and push to your GitHub account. Please add it in Keys Settings.",
+        });
+      }
+
+      const {
+        sourceOwner,
+        sourceRepo,
+        sourceBranch = "main",
+        targetRepoName,
+        targetDescription = "",
+        isPrivate = false,
+        cloneType = "standalone", // 'standalone' | 'fork'
+      } = req.body;
+
+      if (!sourceOwner || !sourceRepo || !targetRepoName) {
+        return res.status(400).json({ error: "Source owner, source repo, and target repository name are required." });
+      }
+
+      // 1. Verify user token & get authenticated username
+      const userRes = await fetch("https://api.github.com/user", {
+        headers: getGitHubHeaders(token),
+      });
+      if (!userRes.ok) {
+        const err = await userRes.json().catch(() => ({}));
+        return res.status(userRes.status).json({
+          error: `GitHub Token invalid or expired: ${err.message || userRes.statusText}`,
+        });
+      }
+      const userData = await userRes.json();
+      const targetOwner = userData.login;
+
+      if (cloneType === "fork") {
+        // Execute GitHub Fork API
+        const forkRes = await fetch(`https://api.github.com/repos/${sourceOwner}/${sourceRepo}/forks`, {
+          method: "POST",
+          headers: getGitHubHeaders(token),
+          body: JSON.stringify({
+            name: targetRepoName.trim(),
+            default_branch_only: false,
+          }),
+        });
+
+        if (!forkRes.ok) {
+          const err = await forkRes.json().catch(() => ({}));
+          return res.status(forkRes.status).json({
+            error: `Failed to fork repository: ${err.message || forkRes.statusText}`,
+          });
+        }
+
+        const forkData = await forkRes.json();
+        return res.json({
+          success: true,
+          method: "fork",
+          repo: forkData,
+          message: `Successfully forked ${sourceOwner}/${sourceRepo} to ${forkData.full_name}!`,
+        });
+      }
+
+      // Standalone Clone & Push to User's Account
+      // Step A: Create new repo under authenticated user
+      const createRepoRes = await fetch("https://api.github.com/user/repos", {
+        method: "POST",
+        headers: getGitHubHeaders(token),
+        body: JSON.stringify({
+          name: targetRepoName.trim(),
+          description: targetDescription || `Cloned from ${sourceOwner}/${sourceRepo} via Gemini Chat`,
+          private: Boolean(isPrivate),
+          auto_init: true, // initializes with README so default branch exists
+        }),
+      });
+
+      if (!createRepoRes.ok) {
+        const err = await createRepoRes.json().catch(() => ({}));
+        return res.status(createRepoRes.status).json({
+          error: `Failed to create repository "${targetRepoName}" on GitHub: ${err.message || createRepoRes.statusText}`,
+        });
+      }
+
+      const newRepoData = await createRepoRes.json();
+      const targetBranch = newRepoData.default_branch || "main";
+
+      // Step B: Fetch source tree
+      const treeRes = await fetch(
+        `https://api.github.com/repos/${sourceOwner}/${sourceRepo}/git/trees/${encodeURIComponent(sourceBranch)}?recursive=1`,
+        { headers: getGitHubHeaders(token) }
+      );
+
+      if (!treeRes.ok) {
+        const err = await treeRes.json().catch(() => ({}));
+        return res.status(treeRes.status).json({
+          error: `Could not fetch files from source repo ${sourceOwner}/${sourceRepo}: ${err.message}`,
+        });
+      }
+
+      const treeData = await treeRes.json();
+      const rawItems: any[] = treeData.tree || [];
+      // Only keep blob items
+      const blobItems = rawItems.filter((i) => i.type === "blob" && !i.path.startsWith(".git/"));
+
+      // Step C: Push files to the new repository in parallel batches
+      const targetTreeEntries: { path: string; mode: string; type: string; sha: string }[] = [];
+      const batchSize = 6;
+      for (let i = 0; i < blobItems.length; i += batchSize) {
+        const batch = blobItems.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (item) => {
+            try {
+              // Fetch blob content from source
+              const blobRes = await fetch(
+                `https://api.github.com/repos/${sourceOwner}/${sourceRepo}/git/blobs/${item.sha}`,
+                { headers: getGitHubHeaders(token) }
+              );
+              if (!blobRes.ok) return;
+              const blobJson = await blobRes.json();
+
+              // Create blob in target repo
+              const createBlobRes = await fetch(
+                `https://api.github.com/repos/${targetOwner}/${newRepoData.name}/git/blobs`,
+                {
+                  method: "POST",
+                  headers: getGitHubHeaders(token),
+                  body: JSON.stringify({
+                    content: blobJson.content,
+                    encoding: blobJson.encoding || "base64",
+                  }),
+                }
+              );
+
+              if (createBlobRes.ok) {
+                const createdBlobData = await createBlobRes.json();
+                targetTreeEntries.push({
+                  path: item.path,
+                  mode: item.mode || "100644",
+                  type: "blob",
+                  sha: createdBlobData.sha,
+                });
+              }
+            } catch (e) {
+              console.warn(`Error copying file ${item.path}:`, e);
+            }
+          })
+        );
+      }
+
+      if (targetTreeEntries.length > 0) {
+        // Step D: Create Git Tree
+        const createTreeRes = await fetch(
+          `https://api.github.com/repos/${targetOwner}/${newRepoData.name}/git/trees`,
+          {
+            method: "POST",
+            headers: getGitHubHeaders(token),
+            body: JSON.stringify({
+              tree: targetTreeEntries,
+            }),
+          }
+        );
+
+        if (createTreeRes.ok) {
+          const createdTreeData = await createTreeRes.json();
+
+          // Step E: Get latest commit SHA on target branch
+          let parentCommitSha: string | undefined;
+          const refRes = await fetch(
+            `https://api.github.com/repos/${targetOwner}/${newRepoData.name}/git/refs/heads/${encodeURIComponent(targetBranch)}`,
+            { headers: getGitHubHeaders(token) }
+          );
+          if (refRes.ok) {
+            const refData = await refRes.json();
+            parentCommitSha = refData.object?.sha;
+          }
+
+          // Step F: Create Commit
+          const commitRes = await fetch(
+            `https://api.github.com/repos/${targetOwner}/${newRepoData.name}/git/commits`,
+            {
+              method: "POST",
+              headers: getGitHubHeaders(token),
+              body: JSON.stringify({
+                message: `Clone from ${sourceOwner}/${sourceRepo} (${targetTreeEntries.length} files)\n\nCloned and published via Gemini Chat`,
+                tree: createdTreeData.sha,
+                parents: parentCommitSha ? [parentCommitSha] : [],
+              }),
+            }
+          );
+
+          if (commitRes.ok) {
+            const createdCommitData = await commitRes.json();
+
+            // Step G: Update Reference
+            await fetch(
+              `https://api.github.com/repos/${targetOwner}/${newRepoData.name}/git/refs/heads/${encodeURIComponent(targetBranch)}`,
+              {
+                method: "PATCH",
+                headers: getGitHubHeaders(token),
+                body: JSON.stringify({
+                  sha: createdCommitData.sha,
+                  force: true,
+                }),
+              }
+            );
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        method: "standalone",
+        repo: newRepoData,
+        filesCount: targetTreeEntries.length,
+        message: `Successfully cloned and pushed ${targetTreeEntries.length} files to ${newRepoData.full_name}!`,
+      });
+    } catch (err: any) {
+      console.error("Clone repo error:", err);
+      res.status(500).json({ error: err.message || "Failed to clone repository to your GitHub account." });
     }
   });
 

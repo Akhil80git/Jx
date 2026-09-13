@@ -92,6 +92,27 @@ export interface GitHubRepo {
   updated_at: string;
   private: boolean;
   html_url: string;
+  clone_url?: string;
+}
+
+export interface CloneRepoOptions {
+  sourceOwner: string;
+  sourceRepo: string;
+  sourceBranch?: string;
+  targetRepoName: string;
+  targetDescription?: string;
+  isPrivate?: boolean;
+  cloneType?: 'standalone' | 'fork';
+  token?: string;
+}
+
+export interface CloneRepoResult {
+  success: boolean;
+  method?: 'standalone' | 'fork';
+  repo: GitHubRepo;
+  filesCount?: number;
+  message?: string;
+  error?: string;
 }
 
 export interface GitHubTreeItem {

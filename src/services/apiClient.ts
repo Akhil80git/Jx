@@ -761,3 +761,62 @@ export async function runUnifiedProjectDeepScan(options: {
 
   return await res.json();
 }
+
+/**
+ * Clone & push currently selected repository to authenticated user's GitHub account
+ */
+export async function cloneRepoToGitHubAccount(options: {
+  sourceOwner: string;
+  sourceRepo: string;
+  sourceBranch?: string;
+  targetRepoName: string;
+  targetDescription?: string;
+  isPrivate?: boolean;
+  cloneType?: 'standalone' | 'fork';
+  token?: string;
+  signal?: AbortSignal;
+}): Promise<{
+  success: boolean;
+  method?: 'standalone' | 'fork';
+  repo: any;
+  filesCount?: number;
+  message?: string;
+}> {
+  const {
+    sourceOwner,
+    sourceRepo,
+    sourceBranch = 'main',
+    targetRepoName,
+    targetDescription,
+    isPrivate = false,
+    cloneType = 'standalone',
+    token,
+    signal,
+  } = options;
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['x-github-token'] = token;
+
+  const res = await fetch('/api/github/clone-repo', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      token,
+      sourceOwner,
+      sourceRepo,
+      sourceBranch,
+      targetRepoName,
+      targetDescription,
+      isPrivate,
+      cloneType,
+    }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to clone repository (${res.status})`);
+  }
+
+  return await res.json();
+}

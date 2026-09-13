@@ -7,6 +7,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { GitHubActivityPanel } from './components/GitHubActivityPanel';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { CloneRepoModal } from './components/CloneRepoModal';
 import { TokenSidebar } from './components/TokenSidebar';
 import {
   ChatMessage,
@@ -46,6 +47,7 @@ export default function App() {
   const [hasEnvKey, setHasEnvKey] = useState<boolean>(false);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState<boolean>(false);
 
   // Layout View States
   const [isRepoSidebarOpen, setIsRepoSidebarOpen] = useState<boolean>(true);
@@ -712,6 +714,8 @@ export default function App() {
         isActivityPanelOpen={isActivityPanelOpen}
         onToggleActivityPanel={() => setIsActivityPanelOpen(!isActivityPanelOpen)}
         selectedModel={selectedChatModel}
+        selectedRepoName={selectedRepo?.full_name}
+        onOpenCloneModal={() => setIsCloneModalOpen(true)}
       />
 
       {/* 5-Pane Workspace Layout with GitHub Live Activity Panel */}
@@ -828,6 +832,23 @@ export default function App() {
         hasEnvKeyFallback={hasEnvKey}
         currentGithubToken={githubToken}
         onSaveGithubToken={handleSaveGithubToken}
+      />
+
+      {/* Clone & Push to GitHub Modal */}
+      <CloneRepoModal
+        isOpen={isCloneModalOpen}
+        onClose={() => setIsCloneModalOpen(false)}
+        selectedRepo={selectedRepo}
+        branch={branch}
+        treeItems={treeItems}
+        githubToken={githubToken}
+        onSaveGithubToken={handleSaveGithubToken}
+        onSuccessClone={(newRepo) => {
+          setRepos((prev) => [newRepo, ...prev.filter((r) => r.id !== newRepo.id)]);
+          setSelectedRepo(newRepo);
+          setToastMessage(`Switched to cloned repository: ${newRepo.full_name}`);
+          setTimeout(() => setToastMessage(null), 4000);
+        }}
       />
 
       {/* Confirm Delete Chat Modal */}

@@ -188,25 +188,35 @@ export function GitHubActivityPanel({
     const filesList = (commitDetail.files || [])
       .map(
         (f) =>
-          `- **\`${f.filename}\`** (${f.status}, <span style="color:#34d399">+${f.additions}</span> / <span style="color:#f87171">-${f.deletions}</span>)`
+          `### 📄 \`${f.filename}\` (\`${f.status}\`, +${f.additions} / -${f.deletions})\n- **Role in Commit**: Modified for "${commitDetail.commit.message}"\n- **Changes**: ${f.additions} additions, ${f.deletions} deletions`
       )
-      .join('\n');
+      .join('\n\n');
 
-    const fallbackMarkdown = `# 📌 Commit Explanation: \`${commitDetail.sha.slice(0, 7)}\`
+    const fallbackMarkdown = `# 📦 Commit Review & Architecture Docs: \`${commitDetail.sha.slice(0, 7)}\`
 
-## 🎯 Commit Purpose (Kyu kiya gaya change)
-**Message**: ${commitDetail.commit.message}
-**Author**: ${commitDetail.commit.author.name} (${new Date(commitDetail.commit.author.date).toLocaleString()})
+> **Commit**: ${commitDetail.commit.message}  
+> **Author**: ${commitDetail.commit.author.name} | **Date**: ${new Date(commitDetail.commit.author.date).toLocaleString()}  
+> **Stats**: Total changes ${commitDetail.stats?.total || 0} (+${commitDetail.stats?.additions || 0} / -${commitDetail.stats?.deletions || 0}) across ${commitDetail.files?.length || 0} files
 
-## 📂 Files Modified (${commitDetail.files?.length || 0} files)
+---
+
+## 🎯 1. Master Purpose & Overall Intent (Kyu Aur Kya Banane Ki Koshish Ki Gayi)
+- **Primary Goal & Intent**: ${commitDetail.commit.message}
+- **Global Scope of Changes**: This commit affects ${commitDetail.files?.length || 0} files across the repository to implement the requested changes and updates.
+- **Architectural Impact**: Updates repository files with +${commitDetail.stats?.additions || 0} lines added and -${commitDetail.stats?.deletions || 0} lines removed.
+
+---
+
+## 📂 2. File-by-File Documentation & Breakdown (Neeche Har File Ka Short Doc)
 ${filesList || 'No file changes recorded.'}
 
-## 📊 Summary of Code Modifications
-- **Total Changes**: ${commitDetail.stats?.total || 0} lines
-- **Additions**: +${commitDetail.stats?.additions || 0}
-- **Deletions**: -${commitDetail.stats?.deletions || 0}
+---
 
-*Note: Generated using local Git diff inspection.*`;
+## 📊 3. Summary & Verification
+- **Total Files Touched**: ${commitDetail.files?.length || 0}
+- **Verification Status**: Ready for review and testing against repository components.
+
+*Note: Generated using local Git diff parser.*`;
 
     setAiDocs((prev) => ({
       ...prev,

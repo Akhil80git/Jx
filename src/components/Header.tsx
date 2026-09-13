@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Github,
   GitCommit,
+  GitFork,
 } from 'lucide-react';
 import { FIXED_MODEL, GeminiModelOption } from '../types';
 
@@ -36,6 +37,8 @@ interface HeaderProps {
   isActivityPanelOpen: boolean;
   onToggleActivityPanel: () => void;
   selectedModel?: GeminiModelOption;
+  selectedRepoName?: string | null;
+  onOpenCloneModal?: () => void;
 }
 
 export function Header({
@@ -59,6 +62,8 @@ export function Header({
   isActivityPanelOpen,
   onToggleActivityPanel,
   selectedModel,
+  selectedRepoName,
+  onOpenCloneModal,
 }: HeaderProps) {
   const activeModel = selectedModel || FIXED_MODEL;
   return (
@@ -144,6 +149,25 @@ export function Header({
 
         {/* Center/Right: Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* "Clone to My GitHub" Button in Top Nav */}
+          {onOpenCloneModal && (
+            <button
+              id="top-nav-clone-repo-btn"
+              type="button"
+              onClick={onOpenCloneModal}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-900/70 to-blue-900/70 hover:from-indigo-800/80 hover:to-blue-800/80 text-indigo-200 hover:text-white text-xs font-semibold border border-indigo-700/50 transition-all shadow-xs active:scale-95 cursor-pointer"
+              title={
+                selectedRepoName
+                  ? `Clone "${selectedRepoName}" to your personal GitHub account`
+                  : 'Clone repository to your personal GitHub account'
+              }
+            >
+              <GitFork className="w-3.5 h-3.5 text-indigo-300" />
+              <span className="hidden sm:inline font-medium">Clone to GitHub</span>
+              <span className="sm:hidden">Clone</span>
+            </button>
+          )}
+
           {/* "+ New Chat" Button */}
           <button
             id="new-chat-btn"
