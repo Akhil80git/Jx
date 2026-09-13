@@ -217,7 +217,7 @@ export function ChatInput({
                 >
                   {GEMINI_MODELS.map((m) => (
                     <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
-                      {m.name} {m.id === 'gemini-3.5-flash-lite' ? '(Default)' : ''}
+                      {m.name} {m.id === DEFAULT_GEMINI_MODEL.id ? '(Default)' : ''}
                     </option>
                   ))}
                 </select>

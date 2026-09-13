@@ -317,14 +317,14 @@ async function streamDirectGeminiRest(options: {
   signal?: AbortSignal;
 }): Promise<void> {
   const rawModel = options.model || DEFAULT_GEMINI_MODEL.id;
-  // Map friendly ID for direct REST endpoint
-  const modelId = rawModel.includes('flash-lite')
-    ? 'gemini-2.5-flash-lite'
-    : rawModel.includes('3.5-flash')
-    ? 'gemini-2.5-flash'
-    : rawModel.includes('3.7')
-    ? 'gemini-2.5-flash'
-    : 'gemini-2.5-flash';
+  // Map friendly ID for direct REST endpoint (never use deprecated 2.5 models)
+  const modelId = rawModel.includes('3.7')
+    ? 'gemini-3.7-flash'
+    : rawModel.includes('3.8')
+    ? 'gemini-3.8-flash'
+    : rawModel.includes('3.5')
+    ? 'gemini-3.8-flash'
+    : 'gemini-3.8-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     modelId
   )}:streamGenerateContent?alt=sse&key=${encodeURIComponent(options.apiKey.trim())}`;

@@ -711,6 +711,7 @@ export default function App() {
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
         isActivityPanelOpen={isActivityPanelOpen}
         onToggleActivityPanel={() => setIsActivityPanelOpen(!isActivityPanelOpen)}
+        selectedModel={selectedChatModel}
       />
 
       {/* 5-Pane Workspace Layout with GitHub Live Activity Panel */}
@@ -772,7 +773,7 @@ export default function App() {
           onOpenFileInEditor={(path) => handleSelectFile(path)}
         />
 
-        {/* Pane 4: Gemini 3.8 AI Hub (Dual Vertical: Architecture & Endpoints + Chat) */}
+        {/* Pane 4: Gemini AI Chat Panel */}
         <ChatPanel
           messages={messages}
           isStreaming={isStreaming}
@@ -793,17 +794,6 @@ export default function App() {
           isMultiFileMode={isMultiFileMode}
           onToggleMultiFileMode={handleToggleMultiFileMode}
           selectedRepo={selectedRepo}
-          repoAnalysisState={repoAnalysisState}
-          onSelectFileDocPath={(path) => {
-            setRepoAnalysisState((prev) => ({
-              ...prev,
-              activeFileDocPath: path,
-            }));
-          }}
-          onOpenInEditor={(path) => {
-            handleSelectFile(path);
-          }}
-          onTriggerReAnalysis={handleTriggerDeepScan}
           selectedChatModel={selectedChatModel}
           onSelectChatModel={setSelectedChatModel}
         />

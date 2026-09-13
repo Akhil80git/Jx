@@ -66,27 +66,18 @@ async function executeGeminiWithRetry<T>(
 }
 
 function getGeminiModelForSdk(requestedModel?: string): string {
-  if (!requestedModel) return "gemini-3.1-flash-lite";
+  if (!requestedModel) return "gemini-3.8-flash";
   const m = requestedModel.toLowerCase().trim();
-  if (
-    m === "gemini-3.5-flash-lite" ||
-    m.includes("3.5-flash-lite") ||
-    m.includes("flash-lite") ||
-    m.includes("flashlight") ||
-    m.includes("lite")
-  ) {
-    return "gemini-3.1-flash-lite";
-  }
-  if (m === "gemini-3.5-flash" || m.includes("3.5-flash")) {
-    return "gemini-flash-latest";
-  }
   if (m === "gemini-3.7-flash" || m.includes("3.7")) {
-    return "gemini-3.8-flash";
+    return "gemini-3.7-flash";
   }
   if (m === "gemini-3.8-flash" || m.includes("3.8")) {
     return "gemini-3.8-flash";
   }
-  return requestedModel;
+  if (m === "gemini-3.5-flash" || m.includes("3.5")) {
+    return "gemini-3.8-flash";
+  }
+  return "gemini-3.8-flash";
 }
 
 const PORT = 3000;
@@ -855,7 +846,7 @@ Your response MUST be in this JSON structure:
           config: {
             systemInstruction:
               systemInstruction ||
-              `You are a helpful, knowledgeable, and polite AI assistant powered by Google ${model || 'Gemini 3.5 Flash-Lite'}. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.`,
+              `You are a helpful, knowledgeable, and polite AI assistant powered by Google ${model || 'Gemini 3.5 Flash'}. Use clear markdown formatting (bolding, lists, code blocks) when beneficial.`,
           },
         });
       } catch (streamInitErr: any) {

@@ -13,7 +13,7 @@ import {
   Github,
   GitCommit,
 } from 'lucide-react';
-import { FIXED_MODEL } from '../types';
+import { FIXED_MODEL, GeminiModelOption } from '../types';
 
 interface HeaderProps {
   hasCustomKey: boolean;
@@ -35,6 +35,7 @@ interface HeaderProps {
   onToggleChat: () => void;
   isActivityPanelOpen: boolean;
   onToggleActivityPanel: () => void;
+  selectedModel?: GeminiModelOption;
 }
 
 export function Header({
@@ -57,7 +58,9 @@ export function Header({
   onToggleChat,
   isActivityPanelOpen,
   onToggleActivityPanel,
+  selectedModel,
 }: HeaderProps) {
+  const activeModel = selectedModel || FIXED_MODEL;
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-2.5 sm:px-4 py-2">
       <div className="flex items-center justify-between gap-2">
@@ -70,14 +73,14 @@ export function Header({
           <div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <h1 className="text-xs sm:text-sm font-bold text-white tracking-tight">Gemini Chat</h1>
-              {/* Fixed Single Model Badge */}
+              {/* Dynamic Model Badge */}
               <div
-                id="fixed-model-badge"
+                id="active-model-header-badge"
                 className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-950/70 border border-indigo-700/60 text-indigo-300 text-[11px] font-semibold"
-                title="Active Model: Gemini 3.5 Flash-Lite"
+                title={`Active Model: ${activeModel.name}`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>{FIXED_MODEL.name}</span>
+                <span>{activeModel.name}</span>
               </div>
             </div>
           </div>
