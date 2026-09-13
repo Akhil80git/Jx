@@ -9,7 +9,6 @@ import {
   GitHubPullRequestItem,
   GitHubIssueItem,
   CommitAiAnalysisDoc,
-  DeepScanDocs,
 } from '../types';
 import { parseGitignore, isPathIgnored } from '../utils/gitignore';
 
@@ -819,4 +818,43 @@ export async function cloneRepoToGitHubAccount(options: {
   }
 
   return await res.json();
+}
+
+/**
+ * Fetch Live Production Deployments & Environment URLs for a repository
+ */
+export async function fetchRepoDeployments(
+  owner: string,
+  repo: string,
+  token?: string
+): Promise<Array<{
+  id: string;
+  repoFullName: string;
+  repoName: string;
+  environment: string;
+  url: string;
+  creator: string;
+  createdAt: string;
+  provider: string;
+}>> {
+  const cleanToken = token?.trim() || '';
+  const headers: Record<string, string> = {};
+  if (cleanToken) headers['x-github-token'] = cleanToken;
+
+  try {
+    const res = await fetch(
+      `/api/github/deployments?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`,
+      { headers }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.deployments)) {
+        return data.deployments;
+      }
+    }
+  } catch {
+    // fallback or empty
+  }
+
+  return [];
 }

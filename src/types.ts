@@ -93,6 +93,7 @@ export interface GitHubRepo {
   private: boolean;
   html_url: string;
   clone_url?: string;
+  homepage?: string | null;
 }
 
 export interface CloneRepoOptions {
@@ -198,17 +199,20 @@ export interface RepoAnalysisState {
   error?: string | null;
 }
 
-export type CenterTab = 'code' | 'docs' | 'preview';
-export type DocsSubTab = 'overview' | 'endpoints' | 'structure' | 'features';
-export type ChatHubTab = 'architecture' | 'activity' | 'chat';
+export type CenterTab = 'code' | 'preview';
+export type ChatHubTab = 'activity' | 'chat';
 
-export interface DeepScanDocs {
-  projectOverview: string; // Doc 1: Kyu ban raha hai & deep overview
-  endpoints: string; // Doc 2: All endpoints in whole site
-  structureArchitecture: string; // Doc 3: Complete architecture & codebase structure
-  featuresCatalog: string; // Doc 4: All features & capabilities in project
-  isScanning: boolean;
-  generatedAt?: number;
+export interface ProductionDeploymentItem {
+  id: string;
+  repoFullName: string;
+  repoName: string;
+  environment: string;
+  url: string;
+  provider: 'Vercel' | 'Netlify' | 'GitHub Pages' | 'Cloudflare' | 'Render' | 'Heroku' | 'Railway' | 'Custom' | string;
+  iconType?: string;
+  createdAt?: string;
+  creator?: string;
+  isCustom?: boolean;
 }
 
 export interface GitHubCommitItem {

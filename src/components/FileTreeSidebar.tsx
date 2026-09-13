@@ -28,8 +28,8 @@ interface FileTreeSidebarProps {
   branch: string;
   activeFile: ActiveFile | null;
   onSelectFile: (path: string) => void;
-  onTriggerDeepScan: () => void;
-  isScanning: boolean;
+  onTriggerDeepScan?: () => void;
+  isScanning?: boolean;
   gitignorePatterns: string[];
   isLoadingTree: boolean;
   isOpen: boolean;

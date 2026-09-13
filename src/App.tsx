@@ -8,6 +8,7 @@ import { GitHubActivityPanel } from './components/GitHubActivityPanel';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { CloneRepoModal } from './components/CloneRepoModal';
+import { LiveDeploymentsDrawer } from './components/LiveDeploymentsDrawer';
 import { TokenSidebar } from './components/TokenSidebar';
 import {
   ChatMessage,
@@ -19,7 +20,6 @@ import {
   RepoAnalysisState,
   FileAnalysisDoc,
   RepoArchitectureDoc,
-  DeepScanDocs,
   GEMINI_MODELS,
   DEFAULT_GEMINI_MODEL,
   GeminiModelOption,
@@ -52,9 +52,14 @@ export default function App() {
   // Layout View States
   const [isRepoSidebarOpen, setIsRepoSidebarOpen] = useState<boolean>(true);
   const [isFileSidebarOpen, setIsFileSidebarOpen] = useState<boolean>(true);
+  const [isCodeWorkspaceOpen, setIsCodeWorkspaceOpen] = useState<boolean>(true);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
   const [isActivityPanelOpen, setIsActivityPanelOpen] = useState<boolean>(true);
   const [isTokenSidebarOpen, setIsTokenSidebarOpen] = useState<boolean>(false);
+  const [isLiveSitesOpen, setIsLiveSitesOpen] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('gemini_chat_theme') as 'dark' | 'light') || 'dark';
+  });
   const [activeCenterTab, setActiveCenterTab] = useState<CenterTab>('code');
 
   // GitHub State
@@ -95,15 +100,6 @@ export default function App() {
   });
 
   const autoAnalysisAbortRef = useRef<AbortController | null>(null);
-
-  // 4 Large AI Generated Documents
-  const [deepScanDocs, setDeepScanDocs] = useState<DeepScanDocs>({
-    projectOverview: '',
-    endpoints: '',
-    structureArchitecture: '',
-    featuresCatalog: '',
-    isScanning: false,
-  });
 
   // Generated Documentation (.md files)
   const [generatedDocs, setGeneratedDocs] = useState<GeneratedDocs>({
@@ -284,9 +280,6 @@ export default function App() {
               [fileDoc.path]: fileDoc,
             },
           }));
-        },
-        onDeepScanDocsComplete: (docs) => {
-          setDeepScanDocs(docs);
         },
       });
 
@@ -691,7 +684,11 @@ export default function App() {
   }, 0);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 antialiased overflow-hidden font-sans selection:bg-blue-600 selection:text-white">
+    <div
+      className={`flex flex-col h-screen antialiased overflow-hidden font-sans selection:bg-blue-600 selection:text-white ${
+        theme === 'dark' ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-900 text-slate-100'
+      }`}
+    >
       {/* Top Header */}
       <Header
         hasCustomKey={Boolean(apiKey)}
@@ -709,16 +706,26 @@ export default function App() {
         onToggleRepoSidebar={() => setIsRepoSidebarOpen(!isRepoSidebarOpen)}
         isFileSidebarOpen={isFileSidebarOpen}
         onToggleFileSidebar={() => setIsFileSidebarOpen(!isFileSidebarOpen)}
+        isCodeWorkspaceOpen={isCodeWorkspaceOpen}
+        onToggleCodeWorkspace={() => setIsCodeWorkspaceOpen(!isCodeWorkspaceOpen)}
         isChatOpen={isChatOpen}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
         isActivityPanelOpen={isActivityPanelOpen}
         onToggleActivityPanel={() => setIsActivityPanelOpen(!isActivityPanelOpen)}
+        isLiveSitesOpen={isLiveSitesOpen}
+        onToggleLiveSites={() => setIsLiveSitesOpen(!isLiveSitesOpen)}
+        theme={theme}
+        onToggleTheme={() => {
+          const next = theme === 'dark' ? 'light' : 'dark';
+          setTheme(next);
+          localStorage.setItem('gemini_chat_theme', next);
+        }}
         selectedModel={selectedChatModel}
         selectedRepoName={selectedRepo?.full_name}
         onOpenCloneModal={() => setIsCloneModalOpen(true)}
       />
 
-      {/* 5-Pane Workspace Layout with GitHub Live Activity Panel */}
+      {/* 5-Pane Workspace Layout with GitHub Live Activity Panel & Code Workspace Toggle */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Pane 1: GitHub Repositories (Vertical Left) */}
         <RepoSidebar
@@ -754,28 +761,25 @@ export default function App() {
           onClearChatFiles={handleClearChatFiles}
         />
 
-        {/* Pane 3: Center Code Workspace & Documentation */}
-        <CodeWorkspace
-          activeFile={activeFile}
-          onChangeFileContent={(content) => {
-            if (activeFile) {
-              setActiveFile({ ...activeFile, content, isModified: true });
-            }
-          }}
-          onSaveFile={handleSaveFileLocal}
-          generatedDocs={generatedDocs}
-          deepScanDocs={deepScanDocs}
-          architectureDoc={repoAnalysisState.architectureDoc}
-          onTriggerDeepScan={handleTriggerDeepScan}
-          onAskGeminiAboutFile={(prompt) => {
-            setIsChatOpen(true);
-            handleSendMessage(prompt, { mode: 'chat', includeFile: true });
-          }}
-          isScanning={repoAnalysisState.isAnalyzing || isScanning}
-          activeCenterTab={activeCenterTab}
-          onChangeCenterTab={setActiveCenterTab}
-          onOpenFileInEditor={(path) => handleSelectFile(path)}
-        />
+        {/* Pane 3: Center Code Workspace & Editor */}
+        {isCodeWorkspaceOpen && (
+          <CodeWorkspace
+            activeFile={activeFile}
+            onChangeFileContent={(content) => {
+              if (activeFile) {
+                setActiveFile({ ...activeFile, content, isModified: true });
+              }
+            }}
+            onSaveFile={handleSaveFileLocal}
+            onAskGeminiAboutFile={(prompt) => {
+              setIsChatOpen(true);
+              handleSendMessage(prompt, { mode: 'chat', includeFile: true });
+            }}
+            activeCenterTab={activeCenterTab}
+            onChangeCenterTab={setActiveCenterTab}
+            onOpenFileInEditor={(path) => handleSelectFile(path)}
+          />
+        )}
 
         {/* Pane 4: Gemini AI Chat Panel */}
         <ChatPanel
@@ -822,6 +826,15 @@ export default function App() {
           draftAnalytics={draftAnalytics}
         />
       </div>
+
+      {/* Live Sites & Deployments Modal Drawer */}
+      <LiveDeploymentsDrawer
+        isOpen={isLiveSitesOpen}
+        onClose={() => setIsLiveSitesOpen(false)}
+        repos={repos}
+        selectedRepo={selectedRepo}
+        githubToken={githubToken}
+      />
 
       {/* API Key & GitHub Token Modal */}
       <ApiKeyModal

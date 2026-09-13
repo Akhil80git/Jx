@@ -383,6 +383,84 @@ async function startServer() {
     }
   });
 
+  // GitHub Deployments and Live Production URL discovery endpoint
+  app.get("/api/github/deployments", async (req, res) => {
+    try {
+      const owner = (req.query.owner as string)?.trim();
+      const repo = (req.query.repo as string)?.trim();
+      const token = ((req.headers["x-github-token"] as string) || (req.query.token as string))?.trim();
+
+      if (!owner || !repo) {
+        return res.status(400).json({ error: "Owner and repo are required." });
+      }
+
+      const deploymentsUrl = `https://api.github.com/repos/${owner}/${repo}/deployments?per_page=20`;
+      const ghRes = await fetch(deploymentsUrl, { headers: getGitHubHeaders(token) });
+
+      let deployments: any[] = [];
+      if (ghRes.ok) {
+        deployments = await ghRes.json();
+      }
+
+      const liveUrls: Array<{
+        id: string;
+        repoFullName: string;
+        repoName: string;
+        environment: string;
+        url: string;
+        creator: string;
+        createdAt: string;
+        provider: string;
+      }> = [];
+
+      if (Array.isArray(deployments)) {
+        for (const dep of deployments.slice(0, 10)) {
+          try {
+            const statusUrl = dep.statuses_url || `https://api.github.com/repos/${owner}/${repo}/deployments/${dep.id}/statuses`;
+            const statusRes = await fetch(statusUrl, { headers: getGitHubHeaders(token) });
+            if (statusRes.ok) {
+              const statuses = await statusRes.json();
+              if (Array.isArray(statuses) && statuses.length > 0) {
+                const latestSuccess = statuses.find(
+                  (s: any) => s.state === 'success' && (s.environment_url || s.target_url)
+                ) || statuses[0];
+
+                const targetUrl = latestSuccess?.environment_url || latestSuccess?.target_url;
+                if (targetUrl && (targetUrl.startsWith('http://') || targetUrl.startsWith('https://'))) {
+                  let provider = 'Production';
+                  if (targetUrl.includes('vercel.app')) provider = 'Vercel';
+                  else if (targetUrl.includes('netlify.app')) provider = 'Netlify';
+                  else if (targetUrl.includes('github.io')) provider = 'GitHub Pages';
+                  else if (targetUrl.includes('pages.dev')) provider = 'Cloudflare';
+                  else if (targetUrl.includes('onrender.com')) provider = 'Render';
+                  else if (targetUrl.includes('railway.app')) provider = 'Railway';
+                  else if (targetUrl.includes('herokuapp.com')) provider = 'Heroku';
+
+                  liveUrls.push({
+                    id: String(dep.id),
+                    repoFullName: `${owner}/${repo}`,
+                    repoName: repo,
+                    environment: dep.environment || 'Production',
+                    url: targetUrl,
+                    creator: dep.creator?.login || 'CI/CD Bot',
+                    createdAt: dep.created_at,
+                    provider,
+                  });
+                }
+              }
+            }
+          } catch {
+            // ignore individual deployment status error
+          }
+        }
+      }
+
+      res.json({ deployments: liveUrls });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch deployments." });
+    }
+  });
+
   // AI Commit Explainer Document generator
   app.post("/api/github/explain-commit", async (req, res) => {
     try {

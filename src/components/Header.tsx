@@ -9,10 +9,14 @@ import {
   Cpu,
   FolderGit2,
   FolderTree,
+  FileCode,
   MessageSquare,
   Github,
   GitCommit,
   GitFork,
+  Globe,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { FIXED_MODEL, GeminiModelOption } from '../types';
 
@@ -32,10 +36,16 @@ interface HeaderProps {
   onToggleRepoSidebar: () => void;
   isFileSidebarOpen: boolean;
   onToggleFileSidebar: () => void;
+  isCodeWorkspaceOpen: boolean;
+  onToggleCodeWorkspace: () => void;
   isChatOpen: boolean;
   onToggleChat: () => void;
   isActivityPanelOpen: boolean;
   onToggleActivityPanel: () => void;
+  isLiveSitesOpen: boolean;
+  onToggleLiveSites: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
   selectedModel?: GeminiModelOption;
   selectedRepoName?: string | null;
   onOpenCloneModal?: () => void;
@@ -57,10 +67,16 @@ export function Header({
   onToggleRepoSidebar,
   isFileSidebarOpen,
   onToggleFileSidebar,
+  isCodeWorkspaceOpen,
+  onToggleCodeWorkspace,
   isChatOpen,
   onToggleChat,
   isActivityPanelOpen,
   onToggleActivityPanel,
+  isLiveSitesOpen,
+  onToggleLiveSites,
+  theme,
+  onToggleTheme,
   selectedModel,
   selectedRepoName,
   onOpenCloneModal,
@@ -69,7 +85,7 @@ export function Header({
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-2.5 sm:px-4 py-2">
       <div className="flex items-center justify-between gap-2">
-        {/* Left: Brand & Sidebar Toggles */}
+        {/* Left: Brand & Panel Toggles */}
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
             <Sparkles className="w-4 h-4" />
@@ -92,6 +108,7 @@ export function Header({
 
           {/* Panel Toggle Icons */}
           <div className="flex items-center gap-1 ml-1 sm:ml-2 pl-2 border-l border-slate-800">
+            {/* 1. Repos Panel Toggle */}
             <button
               type="button"
               onClick={onToggleRepoSidebar}
@@ -105,6 +122,7 @@ export function Header({
               <FolderGit2 className="w-3.5 h-3.5" />
             </button>
 
+            {/* 2. Files Panel Toggle */}
             <button
               type="button"
               onClick={onToggleFileSidebar}
@@ -113,11 +131,27 @@ export function Header({
                   ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
               }`}
-              title="Toggle Files & Folders Panel"
+              title="Toggle Files & Folders Tree Panel"
             >
               <FolderTree className="w-3.5 h-3.5" />
             </button>
 
+            {/* 3. Code Workspace Toggle */}
+            <button
+              id="top-nav-toggle-code-workspace"
+              type="button"
+              onClick={onToggleCodeWorkspace}
+              className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                isCodeWorkspaceOpen
+                  ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              title="Toggle Center Code Workspace & Editor"
+            >
+              <FileCode className="w-3.5 h-3.5" />
+            </button>
+
+            {/* 4. Chat Panel Toggle */}
             <button
               type="button"
               onClick={onToggleChat}
@@ -131,6 +165,7 @@ export function Header({
               <MessageSquare className="w-3.5 h-3.5" />
             </button>
 
+            {/* 5. Live Activity Toggle */}
             <button
               type="button"
               onClick={onToggleActivityPanel}
@@ -144,11 +179,42 @@ export function Header({
               <GitCommit className="w-3.5 h-3.5 text-indigo-400" />
               <span className="hidden xl:inline text-[11px]">Live Activity</span>
             </button>
+
+            {/* 6. Live Sites & Production URLs Toggle */}
+            <button
+              id="top-nav-live-sites-btn"
+              type="button"
+              onClick={onToggleLiveSites}
+              className={`p-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+                isLiveSitesOpen
+                  ? 'bg-sky-600/20 text-sky-300 border border-sky-500/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              title="Live Sites, Production Deployments & Vercel Preview"
+            >
+              <Globe className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden xl:inline text-[11px] font-semibold text-sky-300">Live Sites</span>
+            </button>
           </div>
         </div>
 
         {/* Center/Right: Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Light / Dark Mode Toggle */}
+          <button
+            id="theme-toggle-btn"
+            type="button"
+            onClick={onToggleTheme}
+            className="p-1.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:text-amber-400 hover:border-slate-700 transition-colors cursor-pointer"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-3.5 h-3.5 text-amber-400" />
+            ) : (
+              <Moon className="w-3.5 h-3.5 text-indigo-400" />
+            )}
+          </button>
+
           {/* "Clone to My GitHub" Button in Top Nav */}
           {onOpenCloneModal && (
             <button
